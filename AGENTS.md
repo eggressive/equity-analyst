@@ -88,7 +88,7 @@ before code changes:
 ## Data-source pitfalls (verified on this machine)
 
 - SEC EDGAR rejects `dimitar@localhost` in the User-Agent; use
-  `dimitar@example.com` or any RFC-compliant contact. A 403 here is silent.
+  `eggressive@example.com` or any RFC-compliant contact. A 403 here is silent.
 - NSE India direct returns 403; India coverage comes through yfinance `.NS`.
 - Yahoo's `quoteSummary` is crumb-gated (401) for raw HTTP; the library
   handles it, so do not hand-roll requests to Yahoo endpoints.
