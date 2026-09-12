@@ -210,19 +210,22 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    accepts `dimitar@example.com`. Every SEC call failed silently until fixed.
 
 9. **Corporate action read as dilution.** `share_dilution_pct` compares the newest
-   annual share count against the oldest. yfinance restates the annual columns of a bonus
-   issue or split for the newer periods but not for the older ones, so a single series
-   mixes both bases: HDFCBANK.NS carries 7.107bn shares for FY2024 (pre-bonus) next to
-   15.319bn for FY2025 (post-bonus), and the metric read that as **+175.75%**, scoring the
-   `dilution` signal at -2 on the 1:1 bonus of 2025-08-26. The metric is now refused when
-   two things hold together: the change doubles or halves the count across the window, and
-   a material split or bonus (1.5:1 or larger, or its reverse) is dated inside the statement
-   window, read from the full split history rather than the two-year price window: in the
-   same sample 17 splits sit inside a statement window and 9 of them are invisible to a
-   two-year price series (NVDA 10:1 on 2024-06-10, NVO 2:1 on 2023-09-20, GE 1.281 and
-   1.253, MMM 1.196). The
-   refusal is ordinary missing data, so governance coverage drops from 0.5 to 0.375 and the
-   signal leaves the pillar instead of scoring a corporate action.
+   annual share count against the oldest. yfinance can restate the annual columns of a
+   bonus issue or split for the newer periods and leave the older ones, so one series
+   then mixes two bases: HDFCBANK.NS carries 7.107bn shares for FY2024 (pre-bonus) next
+   to 15.319bn for FY2025 (post-bonus), a step of 2.155x that matches its 1:1 bonus of
+   2025-08-26, and the metric read the window as **+175.75%**, scoring the `dilution`
+   signal at -2. That restatement is not the general rule: across the 17 in-window split
+   events in the same sample only this one shows a step at the split factor, which is why
+   the guard needs the split as evidence rather than inferring an artefact from the size
+   of the change. The metric is now refused when two things hold together: the change
+   doubles or halves the count across the window, and a material split or bonus (1.5:1 or
+   larger, or its reverse) is dated inside the statement window, read from the full split
+   history rather than the two-year price window, because 17 splits sit inside a statement
+   window in this sample and 9 of them are invisible to a two-year price series (NVDA 10:1
+   on 2024-06-10, NVO 2:1 on 2023-09-20, GE 1.281 and 1.253, MMM 1.196). The refusal is
+   ordinary missing data, so governance coverage drops from 0.5 to 0.375 and the signal
+   leaves the pillar instead of scoring a corporate action.
    **The split is required evidence, not a magnitude test.** A count that doubles with no
    split behind it is issuance — an all-stock acquisition or sustained equity financing —
    and keeps its -2, because refusing it would delete a real dilution penalty and flatter
