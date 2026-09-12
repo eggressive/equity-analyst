@@ -126,10 +126,13 @@ before code changes:
 
 ## Data-source pitfalls (verified on this machine)
 
-- SEC EDGAR blocks undeclared automated tools: `curl/8.5.0`, `Wget/1.21.4`,
-  `Python-urllib/3.14` and `python-requests/2.32.3` return 403 on `data.sec.gov` and
-  `www.sec.gov`, while a descriptive User-Agent stays at 200. The contact is not
-  validated (`dimitar@localhost` returns 200); keep one for policy compliance. Re-check:
+- SEC EDGAR blocks undeclared automated tools: `curl/8.18.0`, `Wget2/2.2.1`,
+  `Python-urllib/3.14` and `python-requests/2.34.3` return 403 on `data.sec.gov` and
+  `www.sec.gov`, while a descriptive User-Agent stays at 200. The two hosts then
+  differ: on `data.sec.gov` (the only SEC host this repo calls, in `src/data.py`)
+  the contact is not validated, `dimitar@localhost` included; on `www.sec.gov` a
+  plausible email is required and `localhost` returns 403. Keep one anyway, for
+  SEC fair-access policy rather than for the 403. Re-check:
 
   ```bash
   curl -H "User-Agent: EquityAnalyst-Research/0.1 (personal research; eggressive@example.com)" \
