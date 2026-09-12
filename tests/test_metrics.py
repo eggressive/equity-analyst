@@ -25,12 +25,13 @@ INCOME = pd.DataFrame(
 
 
 class FakeBundle:
-    def __init__(self, income):
+    def __init__(self, income, splits=None):
         self.income = income
         self.balance = pd.DataFrame()
         self.cashflow = pd.DataFrame()
         self.quote = {}
         self.price_history = pd.DataFrame()
+        self.splits = pd.Series(dtype=float) if splits is None else splits
 
 
 def test_operating_income_picks_exact_row_not_substring():
@@ -194,6 +195,100 @@ def test_continued_operations_cash_flow_is_operating_cash_flow():
     assert f["cash_conversion_ocf_over_ni"] == 1.32
     # and the row really is operating cash flow: OCF + capex equals the statement's FCF
     assert f["fcf"] == 11027300000.0
+
+
+HDFC_ANNUAL = pd.DataFrame(
+    {"2026": [15406000000.0], "2025": [15319000000.0], "2024": [7107000000.0],
+     "2023": [5587000000.0]},
+    index=["Diluted Average Shares"],
+)
+
+
+def test_mixed_basis_share_series_is_not_reported_as_dilution():
+    """HDFCBANK.NS: yfinance restates the annual columns after the August 2025 1:1 bonus
+    for FY2025 and FY2026 but not for FY2024 and FY2023, so first-against-last reads
+    7.107bn -> 15.406bn = +175.75% and the dilution signal scores -2 on a corporate
+    action. The metric must be refused instead, and the split history is the evidence
+    that this is a corporate action rather than issuance."""
+    hdfc_splits = pd.Series([5.0, 2.0, 2.0],
+                            index=pd.to_datetime(["2011-07-14", "2019-09-19", "2025-08-26"]))
+    gov = metrics.governance(FakeBundle(HDFC_ANNUAL, splits=hdfc_splits))
+    assert gov["share_dilution_pct"] is None
+    assert rubric.build_signals({"governance": gov})["governance"]["dilution"] is None
+
+
+def test_real_issuance_inside_the_band_keeps_its_number():
+    """Realty Income issues equity repeatedly: +48.5% over the window is issuance, not
+    an artefact, and must still be reported and scored."""
+    df = pd.DataFrame({"2026": [911000000.0], "2022": [613000000.0]},
+                      index=["Diluted Average Shares"])
+    gov = metrics.governance(FakeBundle(df))
+    assert gov["share_dilution_pct"] == 48.61
+    assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == -2
+
+
+def test_real_buyback_inside_the_band_keeps_its_number():
+    """AIG bought back steadily: -27.62% is real and scores +2."""
+    df = pd.DataFrame({"2025": [570000000.0], "2022": [788000000.0]},
+                      index=["Diluted Average Shares"])
+    gov = metrics.governance(FakeBundle(df))
+    assert gov["share_dilution_pct"] == -27.66
+    assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == 2
+
+
+def test_reverse_split_shaped_drop_is_refused():
+    """A count that halves or falls further over the window is the same artefact in the
+    other direction (a reverse split restates the newer columns upward)."""
+    df = pd.DataFrame({"2026": [1000000000.0], "2022": [20000000000.0]},
+                      index=["Diluted Average Shares"])
+    reverse = pd.Series([0.1], index=pd.to_datetime(["2025-01-15"]))
+    assert metrics.governance(FakeBundle(df, splits=reverse))["share_dilution_pct"] is None
+
+
+DOUBLED = pd.DataFrame({"2026": [2000000000.0], "2022": [1000000000.0]},
+                       index=["Diluted Average Shares"])
+JUST_UNDER_DOUBLE = pd.DataFrame({"2026": [1990000000.0], "2022": [1000000000.0]},
+                                 index=["Diluted Average Shares"])
+HALVED = pd.DataFrame({"2026": [500000000.0], "2022": [1000000000.0]},
+                      index=["Diluted Average Shares"])
+INSIDE_WINDOW = pd.Series([2.0], index=pd.to_datetime(["2024-06-01"]))
+OUTSIDE_WINDOW = pd.Series([2.0], index=pd.to_datetime(["2019-06-01"]))
+SMALL_ADJUSTMENT = pd.Series([1.06], index=pd.to_datetime(["2024-06-01"]))
+
+
+def test_guard_boundaries_are_exact_with_split_evidence():
+    """Exactly doubling or exactly halving is refused when the window holds a material
+    split; just inside the band is kept."""
+    assert metrics.governance(
+        FakeBundle(DOUBLED, splits=INSIDE_WINDOW))["share_dilution_pct"] is None
+    assert metrics.governance(
+        FakeBundle(HALVED, splits=INSIDE_WINDOW))["share_dilution_pct"] is None
+    assert metrics.governance(
+        FakeBundle(JUST_UNDER_DOUBLE, splits=INSIDE_WINDOW))["share_dilution_pct"] == 99.0
+
+
+def test_doubling_without_a_split_keeps_the_issuance_score():
+    """A doubling with no split in the statement window is issuance: an all-stock
+    acquisition or sustained equity financing. Refusing it would delete the -2 dilution
+    score and flatter the company, so the number must be kept."""
+    gov = metrics.governance(FakeBundle(DOUBLED))
+    assert gov["share_dilution_pct"] == 100.0
+    assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == -2
+
+
+def test_split_outside_the_statement_window_is_not_evidence():
+    """A split older than the oldest annual column cannot rebase the series, so it must
+    not trigger a refusal."""
+    gov = metrics.governance(FakeBundle(DOUBLED, splits=OUTSIDE_WINDOW))
+    assert gov["share_dilution_pct"] == 100.0
+
+
+def test_small_split_adjustment_is_not_evidence():
+    """yfinance records spin-off adjustments as splits too, for example Honeywell at
+    1.061 and 0.9535. Those are far too small to rebase a share series, so they must not
+    let a real doubling escape its score."""
+    gov = metrics.governance(FakeBundle(DOUBLED, splits=SMALL_ADJUSTMENT))
+    assert gov["share_dilution_pct"] == 100.0
 
 
 if __name__ == "__main__":
