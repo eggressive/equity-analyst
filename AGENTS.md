@@ -65,6 +65,15 @@ intact in every change: the LLM layer interprets, the Python layer decides.
 - `runs/` JSON artefacts are the ground truth for what a code change did.
   Before and after a metric or rubric change, diff the artefacts, not just the
   scores.
+- **GitHub work goes through the GitHub MCP tools, not the REST API.** When
+  reading or reviewing PRs, issues, branches or checks, prefer the GitHub MCP
+  server's tools over `gh` shell calls or hand-rolled `curl` against
+  `api.github.com`: the MCP surface gives structured output, handles
+  auth and pagination, and avoids parsing freeform CLI text. Raw `curl`
+  requests to the GitHub API are a last resort, only when an MCP tool for the
+  operation does not exist. Plain `git` commands (clone, commit, push, rebase)
+  are unaffected: this rule covers reading and commenting on GitHub state,
+  not local repository work.
 
 ## Known live defects and owner decisions (do not fix unilaterally)
 
