@@ -167,8 +167,17 @@ only, which is a real gap in the suite rather than a claim of coverage.
 1. **Wrong statement row.** Substring matching let `Other Non Operating Income
    Expenses` satisfy the needle `"Operating Income"`, so Reliance's operating margin
    was reported as **0.34% instead of 11.48%**, and the Bear built a confident thesis
-   on it. Fixed in `_pick_label`: whole-word token matching, exact match
-   short-circuits, fewest-extra-tokens wins. Guarded by `tests/test_metrics.py`.
+   on it. `_pick_label` now requires the needle tokens to appear as a contiguous run,
+   refuses any candidate carrying a meaning-changing token (`non`, `other`,
+   `excluding`, ...), drops the raw-substring fallback, and prefers a leading match
+   with the fewest extra tokens. Guarded by `tests/test_metrics.py`, which now also
+   covers the second instance of the same bug, found later: with no true
+   `Operating Income` row, BRK-B reported **-1.23%** from
+   `Net Non Operating Interest Income Expense` and HDFCBANK.NS **-1.91%** from
+   `Other Non Operating Income Expenses`, both scoring the `operating_margin` signal
+   at -2. BRK-B now falls through to its real `EBIT` row (21.32%); HDFCBANK.NS has no
+   such row, so the metric stays `None` and the coverage fraction dilutes its weight
+   instead of a fabricated number scoring the signal.
 2. **Sign inversion.** An `higher_is_bullish` flag applied to already-ordered
    threshold tables flipped every signal, scoring a low-debt test company as highly
    leveraged. Direction now lives in the table only. Guarded by
