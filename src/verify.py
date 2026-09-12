@@ -5,8 +5,15 @@ that the Bear gets to attack the Bull before a score is issued. This module does
 the mechanical part of that: it checks whether the numbers an agent quoted
 actually exist in the evidence bundle, and flags anything it cannot match.
 
-A claim is only accepted if the number appears in the allowed evidence values
-(relative tolerance) AND the pillar it was attributed to is present.
+Scope, stated plainly, because this is weaker than the name suggests. Matching is
+value-level, not claim-level: a number is accepted if it equals any evidence value
+within `rel_tol`, or any ratio / difference / percentage change between two evidence
+values. The check does NOT verify that a number was attached to the metric the agent
+claimed it for, so "net margin is 18.0%" passes when 18.0 is a P/E elsewhere in the
+bundle. The derived index is generous by construction: on an AAPL bundle of 52
+evidence values it generates ~4,000 derived values and accepts roughly 95% of random
+numbers in 0.05..100. Read `unverified == 0` as "nothing obviously invented", not as
+proof of grounding. Judge output is never passed through this module.
 """
 
 from __future__ import annotations

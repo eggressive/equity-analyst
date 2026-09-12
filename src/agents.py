@@ -162,16 +162,62 @@ def _extract_json(text: str) -> dict | None:
         return None
 
 
-def _valid_keys(bundle: dict) -> set[str]:
-    keys = set()
-    for group, vals in bundle.get("pillars", {}).items():
-        for k in vals:
-            keys.add(f"{group}.{k}")
-    for k in bundle.get("context", {}):
-        keys.add(f"context.{k}")
-    for k in bundle.get("extras", {}):
-        keys.add(f"extras.{k}")
-    return keys
+# The five pillars the bundle always reports coverage for. Citing one of these is
+# legitimate provenance, so "pillar_coverage.governance" is accepted even when a
+# test fixture omits the block. Any other sub-field is not a real key.
+COVERAGE_FIELDS = ("fundamentals", "valuation", "technicals", "risk", "governance")
+
+
+INDEX_RE = re.compile(r"\[(\d+)\]")
+
+
+def _bundle_paths(bundle: dict) -> tuple[set[str], dict[str, int]]:
+    """Every key path that actually exists in the bundle, plus the length of every list.
+
+    Returns (paths, lists). `paths` are canonical and index-free, so `extras.
+    institutional_holders.value` covers all eight holder rows. `lists` maps a list path
+    to its length, which is what lets a *cited* index be checked against reality.
+
+    This replaced a flat allowlist plus prefix matching. The prefix check
+    (`k.startswith(("extras.", "context.", ...))`) accepted any invented key under
+    those roots, so `context.peer_median_pe` or `extras.analyst_consensus_eps` - the
+    exact peer/consensus data the bundle documents as absent - passed citation
+    checking while being fabricated. A key is now valid only if the path resolves
+    to something the bundle really contains.
+    """
+    paths: set[str] = set()
+    lists: dict[str, int] = {}
+
+    def walk(prefix: str, obj):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                path = f"{prefix}.{k}" if prefix else str(k)
+                paths.add(path)
+                walk(path, v)
+        elif isinstance(obj, (list, tuple)):
+            lists[prefix] = len(obj)
+            for item in obj:
+                walk(prefix, item)
+
+    # Pillar values are cited as "group.key" (governance.beta), not "pillars.group.key",
+    # which is what _normalise_key strips toward, so the prefix is dropped here.
+    for group, vals in (bundle.get("pillars") or {}).items():
+        if not isinstance(vals, dict):
+            continue
+        for k, v in vals.items():
+            path = f"{group}.{k}"
+            paths.add(path)
+            walk(path, v)
+    for top in ("context", "extras", "pillar_coverage", "data_quality"):
+        block = bundle.get(top)
+        if isinstance(block, dict):
+            for k, v in block.items():
+                path = f"{top}.{k}"
+                paths.add(path)
+                walk(path, v)
+        elif block is not None:
+            paths.add(top)
+    return paths, lists
 
 
 def _normalise_key(key: str) -> str:
@@ -186,21 +232,47 @@ def _normalise_key(key: str) -> str:
     return k
 
 
+def _indices_resolve(key: str, lists: dict[str, int]) -> bool:
+    """Every [i] in a cited key must address a row that actually exists.
+
+    Paths are generated index-free, so without this check
+    `extras.institutional_holders[99].value` resolves to the generated
+    `extras.institutional_holders.value` and is accepted even though the bundle holds
+    eight holders. Real agents do cite the indexed form (eight times in
+    runs/AAPL_final.json), so the index has to be verified rather than stripped.
+    """
+    for m in INDEX_RE.finditer(key):
+        prefix = re.sub(r"\[\d+\]", "", key[: m.start()]).strip(".")
+        size = lists.get(prefix)
+        if size is None or int(m.group(1)) >= size:
+            return False
+    return True
+
+
 def _check_citations(data: dict, bundle: dict) -> list[str]:
-    allowed = _valid_keys(bundle)
+    allowed, lists = _bundle_paths(bundle)
+    # Bare names are accepted only one level below their root: "beta", "market_cap" or
+    # "news_count" name a metric or field. Leaves nested inside a list item ("value",
+    # "holder") do not, so accepting them would let "value" stand in for a citation.
+    bare = {a.split(".")[-1] for a in allowed if a.count(".") == 1}
     cited = data.get("cited_metrics") or data.get("key_metrics") or []
-    if isinstance(cited, dict):
+    if isinstance(cited, str):
+        # A single key, not a list of characters.
+        cited = [cited]
+    elif isinstance(cited, dict):
         cited = list(cited.keys()) + [v for v in cited.values() if isinstance(v, str)]
     bad = []
     for c in cited:
         if not isinstance(c, str):
             continue
         k = _normalise_key(c)
-        if k in allowed or k.startswith(
-            ("extras.", "context.", "data_quality.", "pillar_coverage.")
-        ):
+        if INDEX_RE.search(k) and not _indices_resolve(k, lists):
+            bad.append(f"cited list index does not resolve: {c}")
             continue
-        if k in {a.split(".")[-1] for a in allowed}:  # bare metric name, e.g. "beta"
+        stripped = re.sub(r"\[\d+\]", "", k)          # extras.holders[0].value
+        if stripped in allowed or ("." not in k and k in bare):
+            continue
+        if k.startswith("pillar_coverage.") and k.split(".", 1)[1] in COVERAGE_FIELDS:
             continue
         bad.append(f"uncited/unknown metric key: {c}")
     return bad

@@ -2,9 +2,12 @@
 
 Sources (all free, no API key required):
   - yfinance: prices, OHLCV history, financial statements, quote metadata. US + NSE (.NS).
-  - SEC EDGAR XBRL companyfacts: authoritative US filings data.
+  - SEC EDGAR XBRL companyfacts: the fetch and ticker-to-CIK helpers exist below, but
+    nothing in the pipeline calls them yet. Every number in a run comes from yfinance.
 
-Every value returned carries provenance so an agent claim can be traced back to a source.
+Provenance: sourced scalar fields (`Evidence`) carry a source string. The metric
+values inside the pillars are keyed by pillar and attributed to the data layer as a
+whole; they do not carry a per-value source string.
 """
 
 from __future__ import annotations

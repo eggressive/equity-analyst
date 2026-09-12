@@ -1,8 +1,9 @@
 """Deterministic metric engine. Python calculates; agents only interpret.
 
 Every number an agent receives comes from here. No agent is allowed to invent one.
-Each pillar returns raw values plus an evidence_coverage flag so the rubric can
-down-weight thin pillars instead of pretending they are equally reliable.
+Each pillar returns raw values only. Coverage is derived elsewhere: `pillar_coverage`
+counts how many declared fields are non-null, and `rubric.score` derives its own
+per-signal coverage, which is the one that dilutes weight.
 """
 
 from __future__ import annotations
@@ -118,11 +119,21 @@ def fundamentals(b) -> dict:
 
     debt = _row(bs, "Total Debt")
     if debt is None:
-        lt = _row(bs, "Long Term Debt") or 0
-        st = _row(bs, "Current Debt", "Short Long Term Debt") or 0
-        debt = _row(bs, "Long Term Debt And Capital Lease Obligation")
-        if debt is None:
-            debt = lt + st
+        # Fall back to components. Two traps live here, and both made a partially
+        # reported balance sheet look less levered than it is:
+        #   1. `or 0` turned "no long-term debt row" into a real zero, so a
+        #      company whose debt rows are missing entirely scored as debt-free
+        #      (leverage signal +2, the most bullish value on the table).
+        #   2. The combined capital-lease row excludes current debt, and it used
+        #      to overwrite the long+short sum computed above it.
+        # Unknown stays None: absence must never score.
+        # The "Long Term Debt" needle also matches the capital-lease variant, which
+        # is the same long-term quantity for this purpose.
+        long_term = _row(bs, "Long Term Debt")
+        short_term = _row(bs, "Current Debt", "Short Long Term Debt",
+                          "Current Debt And Capital Lease Obligation")
+        if long_term is not None or short_term is not None:
+            debt = (long_term or 0) + (short_term or 0)
     equity = _row(bs, "Stockholders Equity", "Total Equity Gross Minority", "Common Stock Equity")
     assets = _row(bs, "Total Assets")
     cash = _row(bs, "Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments")
@@ -151,6 +162,33 @@ def fundamentals(b) -> dict:
     return out
 
 
+def _dividend_yield_pct(q: dict):
+    """Dividend yield as a percent, without double-scaling.
+
+    yfinance 1.7 returns `dividendYield` already scaled as a percent (AAPL reports
+    0.33 for a ~0.33% yield), while older builds returned a fraction (0.0033). The
+    code used to multiply by 100 unconditionally, so AAPL's yield was published as
+    33.0% and the agents spent a paragraph each treating it as a data defect.
+
+    When `dividendRate` and a price are both present, dividendRate/price decides
+    which reading of `dividendYield` is the consistent one. With no cross-check,
+    the pinned provider's semantics (already a percent) are used.
+    """
+    raw = _num(q.get("dividendYield"))
+    if raw is None:
+        return None
+    rate = _num(q.get("dividendRate"))
+    price = (_num(q.get("regularMarketPrice")) or _num(q.get("currentPrice"))
+             or _num(q.get("previousClose")))
+    if rate is not None and price:
+        implied = rate / price * 100
+        if implied > 0:
+            as_percent = abs(raw - implied)
+            as_fraction = abs(raw * 100 - implied)
+            return _r(raw if as_percent <= as_fraction else raw * 100)
+    return _r(raw)
+
+
 def valuation(b) -> dict:
     q = b.quote
     return {
@@ -161,7 +199,7 @@ def valuation(b) -> dict:
         "ev_to_ebitda": _r(_num(q.get("enterpriseToEbitda"))),
         "ev_to_revenue": _r(_num(q.get("enterpriseToRevenue"))),
         "peg": _r(_num(q.get("trailingPegRatio"))),
-        "dividend_yield_pct": _r(None if _num(q.get("dividendYield")) is None else _num(q.get("dividendYield")) * 100),
+        "dividend_yield_pct": _dividend_yield_pct(q),
         "market_cap": _num(q.get("marketCap")),
         "fifty_day_avg": _r(_num(q.get("fiftyDayAverage"))),
         "two_hundred_day_avg": _r(_num(q.get("twoHundredDayAverage"))),

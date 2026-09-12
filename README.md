@@ -2,7 +2,7 @@
 
 A local, open-source rebuild of the pipeline described in Shobhit Agarwal's
 "I Built 9 AI Agents That Argue Over Every Stock, So You Don't Have To"
-(EquityAnalyst.online). Runs on Hermes with free data sources and Ollama Cloud models.
+(EquityAnalyst.online). Runs locally with free data sources and Ollama Cloud models.
 
 ## The pipeline
 
@@ -18,13 +18,14 @@ the LLM layer generates interpretation, the Python layer generates the decision.
 
 | File | Role | LLM involved |
 |------|------|--------------|
-| `src/data.py` | Evidence fetch: yfinance (US + NSE), SEC EDGAR XBRL. Every value carries a source string. | No |
+| `src/data.py` | Evidence fetch: yfinance (US + NSE). Sourced scalar fields carry a source string; SEC EDGAR helpers exist but are not wired in. | No |
 | `src/metrics.py` | 5 metric pillars: fundamentals, valuation, technicals, risk, governance. | No |
 | `src/rubric.py` | Signal tables, two-horizon weights, coverage-diluted scoring. | No |
 | `src/verify.py` | Matches every number an agent emits to an evidence value or a derived ratio. | No |
 | `src/agents.py` | 9 specialists, Bull, Bear, Judge. Strict JSON, citation checking, fallback model. | Yes |
 | `analyze.py` | Orchestration, run artefacts, resume. | No |
-| `tests/test_rubric.py` | Determinism and sign-direction invariants. | No |
+| `tests/test_rubric.py` | Determinism, sign-direction, citation and verifier invariants. | No |
+| `tests/test_metrics.py` | Statement-row matching: the silently-wrong-number class of bug. | No |
 
 ## Install
 
@@ -45,14 +46,15 @@ cp .env.example .env                 # optional, documents the overrides
 ## Usage
 
 ```bash
-set -a; . ~/.hermes/.env; set +a          # OLLAMA_API_KEY
-
-~/venv/bin/python analyze.py AAPL                  # full pipeline
-~/venv/bin/python analyze.py RELIANCE.NS           # NSE
-~/venv/bin/python analyze.py AAPL --no-llm         # deterministic only, zero API cost
-~/venv/bin/python analyze.py AAPL --resume runs/AAPL_partial.json   # reuse ok stages
-~/venv/bin/python tests/test_rubric.py
+.venv/bin/python analyze.py AAPL            # full pipeline
+.venv/bin/python analyze.py RELIANCE.NS     # NSE
+.venv/bin/python analyze.py AAPL --no-llm   # deterministic only, zero API cost
+.venv/bin/python tests/test_rubric.py
+.venv/bin/python tests/test_metrics.py
 ```
+
+`--resume <run.json>` reuses the `ok` stages of an earlier run (`--out` writes the file
+to reuse). No resume fixture ships with this repository, so point it at your own.
 
 Env overrides: `EA_MODEL` (default `deepseek-v4.1-flash:cloud`),
 `EA_FALLBACK_MODEL` (default `glm-5.3:cloud`), `EA_BASE_URL`.
@@ -69,6 +71,13 @@ missing signals are excluded rather than scored zero, and the pillar's coverage
 fraction dilutes its weight. If total confidence falls below 0.45 the result is
 `INSUFFICIENT_DATA` instead of a guess.
 
+Not every signal can reach the ends of that scale. Several tables top out at +1
+(revenue growth, cash conversion, both trend signals) and four are confined to -1..+1
+(RSI, distance from the 52-week high, institutional and insider holding); `max_drawdown`
+cannot reach -2. The practical effect is that the technicals pillar ranges about -1.5..+1.0
+while carrying the largest SHORT_TERM weight, so a short-term verdict is harder to push to
+`STRONG_BULLISH`/`STRONG_BEARISH` than the -2..+2 label suggests.
+
 Two horizons with different weights:
 
 - `SHORT_TERM` (2-8 weeks): technicals 0.35, risk 0.30, valuation 0.15, fundamentals 0.10, governance 0.10
@@ -80,19 +89,41 @@ Two horizons with different weights:
 |---|---|---|---|---|---|---|
 | AAPL | NEUTRAL +0.294 | BULLISH +0.458 | 9/9 | 0.968 | 0 | 51s |
 | RELIANCE.NS | BULLISH +0.500 | BULLISH +0.734 | 9/9 | 0.977 | 0 | 140s |
-| TCS.NS | NEUTRAL +0.246 | BULLISH +0.796 | 9/9 | 0.966 | 0 | 276s |
+| TCS.NS | NEUTRAL +0.246 | BULLISH +0.796 | 9/9 | 0.966 | 0 | 118s |
 
 Artefacts: `runs/AAPL_final.json`, `runs/RELIANCE_full.json`, `runs/TCS_full.json`.
-Every figure in this README is read back from those files, not transcribed by hand.
+Verdicts, scores, grounding rates, agent counts and run times are read back from those
+files. Two caveats. The AAPL run is a *resumed* run: it reused nine specialist outputs and
+the bull from an earlier file, so its 51s covers the bear, verification and judge only,
+and that earlier file is not part of this repository. And the construction-time token
+counts quoted in the failure-mode list below are not all reproducible from the tracked
+artefacts; where that is the case it now says so.
 
-The Bear earned its place on AAPL: it dismantled the "best-in-class margins" claim
-(the bundle contains no peer benchmark, so the claim is unsupported), the 151.91% ROE
-(a capital-structure artifact of a buyback-shrunken equity base plus 1.34 D/E), and
-momentum confirmation (RSI 70.62 with volume 21.86% below its 20-day average). The
-rubric verdict was identical before and after the debate, on every ticker.
+The Bear earned its place on AAPL. Its six attacks in `runs/AAPL_final.json` go after the
+bull's load-bearing claims: that trailing margins prove durable pricing power (the bundle
+carries no peer benchmark or segment detail, so they cannot); that $98.77B of FCF funds
+buybacks "without external capital" (a ~2.0% FCF yield on a $4.85T market cap means
+buybacks retire shares at 38.15x earnings); that one annual OCF/NI of 1.0 is evidence of
+clean earnings quality (one ratio is not a trend); that 31.18% ROA proves a productive asset
+base (a trailing ratio with D/E 1.34 and cash at 10.0% of assets); and that a "confirmed
+uptrend" is a low-risk entry (RSI14 70.62 is overbought on volume 21.86% below its 20-day
+average). The judge recorded the same six as `bull_case_broken`.
 
-**Unmatched numbers are zero across all three tickers**, meaning every figure any agent
-wrote resolved either to an evidence value or to arithmetic over evidence values.
+The debate cannot move the verdict. The rubric is computed from the metric bundle before
+any agent runs, so the debate changes the narrative only. That is a property of the code,
+not of these runs: no artefact stores a before/after verdict pair.
+
+**Unmatched numbers are zero across all three tickers**: every figure any agent wrote
+resolved either to an evidence value or to arithmetic over evidence values. Read that
+carefully, because the check is weaker than it sounds. Matching is value-level, not
+claim-level, and the derived index is generous: 52 AAPL evidence values generate ~4,000
+derived values, and that index accepts roughly 95% of random numbers in 0.05..100. So
+`unverified = 0` means "nothing obviously invented", not "every claim is grounded"; 12.9% of
+AAPL's 342 numbers matched only through the derived index. Two further accounting notes: the
+verifier skips bare 4-digit years after fixing the denominator, so the AAPL/RELIANCE/TCS
+`claims_found` of 342/258/175 includes 11/6/6 numbers that are neither verified nor
+unverified; and `runs/RELIANCE_full.json` records one citation violation, the `flows` agent
+citing `pillar_coverage.governance`.
 
 
 
@@ -107,7 +138,8 @@ Honest gaps, in rough order of impact:
    consensus series, so forward-looking claims rest on one provider number.
 3. **Earnings transcript and filing text.** Founder Desk and Earnings Call
    Analyzer need document ingestion (10-K/Q + transcripts) and a retrieval layer.
-   Not started. SEC EDGAR is wired up for XBRL numbers only, not prose.
+   Not started. The SEC EDGAR helpers in `src/data.py` are not called by the pipeline
+   at all yet, so no number in a run comes from a filing.
 4. **News sentiment actually scored.** Yahoo's headline fields came back null for
    AAPL, so the sentiment agent correctly reported "unscoreable" rather than
    inventing a tone. A real source (news API or RSS + extraction) is needed.
@@ -127,8 +159,10 @@ Honest gaps, in rough order of impact:
 
 ## Known failure modes, already handled
 
-Eight bugs shipped and were fixed during construction. The first four are pure
-Python errors; the last four are LLM-protocol errors. `tests/` guards all of them.
+Eight bugs shipped and were fixed during construction. Bugs 1-5 are Python errors in the
+metric and verification layers; 6 and 7 are LLM-protocol errors; 8 is an HTTP 403 from SEC
+EDGAR. `tests/` guards the first five. Bugs 6, 7 and 8 have no test and are recorded here
+only, which is a real gap in the suite rather than a claim of coverage.
 
 1. **Wrong statement row.** Substring matching let `Other Non Operating Income
    Expenses` satisfy the needle `"Operating Income"`, so Reliance's operating margin
@@ -156,8 +190,9 @@ Python errors; the last four are LLM-protocol errors. `tests/` guards all of the
    failure that widens the ceiling and retries. A truncated response is never
    promoted to an answer.
 7. **Output proportional to input.** Even after (6), the Bear still truncated: the
-   Bull emitted 12 verbose arguments, so the Bear generated unbounded rebuttals
-   (11,213 tokens against an 8,424 ceiling). Widening the cap repeatedly does not
+   Bull emitted up to 12 verbose arguments, so the Bear generated unbounded rebuttals.
+   The saved truncation record is `max_tokens=4860` with ~7,428 tokens used on the
+   primary model and ~7,326 on the fallback. Widening the cap repeatedly does not
    converge, because the output scales with the input. Fixed by hard word and item
    limits in the bull/bear prompts plus trimming the bull's arguments to 6 in the
    payload that the Bear receives. The Bear dropped from `unavailable` to 6 attacks
@@ -166,10 +201,11 @@ Python errors; the last four are LLM-protocol errors. `tests/` guards all of the
    accepts `dimitar@example.com`. Every SEC call failed silently until fixed.
 
 **Fabrication is treated as worse than absence.** A failed agent returns
-`status="unavailable"` with an error string, never plausible-looking prose. This was
-verified twice: once by a run where 5 of 9 agents failed, and once by a TCS run where
-the `valuation` agent truncated on both models and the pipeline reported `agents 8/9`
-rather than passing off a half-written verdict agent as analysis.
+`status="unavailable"` with an error string, never plausible-looking prose: a truncated
+response is detected from `finish_reason == "length"`, retried, and never promoted to an
+answer. Earlier drafts of this paragraph cited a run where 5 of 9 agents failed and a TCS
+run that reported `agents 8/9`. No artefact for either is in this repository, so both have
+been removed: the guarantee rests on the code path, not on a tracked run.
 
 ## Prompt bounding is part of the protocol
 
@@ -186,10 +222,11 @@ always the adversarial one, which is the worst possible component to lose silent
 - **yfinance** 1.7.0 — prices, OHLCV, statements, quote metadata. US and NSE
   (`.NS`). No key. Yahoo's `quoteSummary` endpoint is crumb-gated (401) for raw
   HTTP; the library handles it.
-- **SEC EDGAR XBRL** — `data.sec.gov/api/xbrl/companyfacts`. Free, requires a
-  descriptive User-Agent. 10,426 US tickers via `companyfiles/company_tickers.json`.
-- **NSE India direct** returns 403 to this host; India coverage comes through
-  yfinance `.NS` symbols, which work.
+- **SEC EDGAR XBRL** — `data.sec.gov/api/xbrl/companyfacts`. Free, requires a descriptive
+  User-Agent. `src/data.py` implements `sec_companyfacts` and `resolve_cik`, but nothing
+  calls them yet, so every number in a run currently comes from yfinance.
+- **NSE India direct** returns 403 from the machine this was built on; India coverage comes
+  through yfinance `.NS` symbols, which work.
 
 ## Scope
 
