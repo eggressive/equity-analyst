@@ -75,6 +75,24 @@ intact in every change: the LLM layer interprets, the Python layer decides.
   are unaffected: this rule covers reading and commenting on GitHub state,
   not local repository work.
 
+## Writing style for every document you touch
+
+Applies to `AGENTS.md`, `README.md`, docstrings, PR descriptions and code
+comments alike.
+
+- **Formatting:** bold lead-ins on bullets, backticks for commands and paths,
+  fenced blocks with a language tag.
+- **Voice:** terse and opinionated. Name unknowns as unknowns rather than
+  writing around them, and state caveats and traps explicitly.
+- **One reason per claim, at most.** The failure mode is a justifying clause
+  on every sentence: enjoyable once, exhausting at volume, and it buries
+  the decisions.
+- **Rationale only where contested or counter-intuitive; elsewhere state it
+  and move on.** Prefer a table to a paragraph.
+- **Relative links between documents, including to anchors:** `[Part 5](GitHub/copilot-pilot.md#part-5--decide)`.
+- **Don't duplicate content across documents.** Link to the one that owns
+  the topic.
+
 ## Known live defects and owner decisions (do not fix unilaterally)
 
 Tracked from the 2026-09-12 corpus review. These need the owner's decision
