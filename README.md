@@ -206,8 +206,17 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    limits in the bull/bear prompts plus trimming the bull's arguments to 6 in the
    payload that the Bear receives. The Bear dropped from `unavailable` to 6 attacks
    at 7,076 tokens.
-8. **SEC 403.** EDGAR rejects a User-Agent whose contact is `dimitar@localhost` and
-   accepts `eggressive@example.com`. Every SEC call failed silently until fixed.
+8. **SEC 403.** Measured 2026-09-12. `data.sec.gov` and `www.sec.gov` answer 403 with a
+   page titled "Your
+   Request Originates from an Undeclared Automated Tool" when the User-Agent is a
+   library or bot default: `curl/8.5.0`, `Wget/1.21.4`, `Python-urllib/3.14` and
+   `python-requests/2.32.3` are blocked on `companyfacts`, `submissions`,
+   `company_tickers.json` and `xbrl/frames`, and eight rapid requests with a
+   descriptive string stay at 200. A descriptive product token passes and the contact
+   is not validated: `EquityAnalyst-Research/0.1` with no contact, with
+   `dimitar@localhost`, or with `not-an-email` all return 200. Keep a contact anyway,
+   because SEC's policy asks for one and enforcement is theirs to change. The SEC
+   helpers in `src/data.py` are still called by nothing, so no run depends on this.
 
 9. **Corporate action read as dilution.** `share_dilution_pct` compares the newest
    annual share count against the oldest. yfinance restates the annual columns of a bonus

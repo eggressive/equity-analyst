@@ -114,8 +114,15 @@ before code changes:
 
 ## Data-source pitfalls (verified on this machine)
 
-- SEC EDGAR rejects `dimitar@localhost` in the User-Agent; use
-  `eggressive@example.com` or any RFC-compliant contact. A 403 here is silent.
+- SEC EDGAR blocks undeclared automated tools: `curl/8.5.0`, `Wget/1.21.4`,
+  `Python-urllib/3.14` and `python-requests/2.32.3` return 403 on `data.sec.gov` and
+  `www.sec.gov`, while a descriptive User-Agent stays at 200. The contact is not
+  validated (`dimitar@localhost` returns 200); keep one for policy compliance. Re-check:
+
+  ```bash
+  curl -H "User-Agent: EquityAnalyst-Research/0.1 (personal research; eggressive@example.com)" \
+    https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json
+  ```
 - NSE India direct returns 403; India coverage comes through yfinance `.NS`.
 - Yahoo's `quoteSummary` is crumb-gated (401) for raw HTTP; the library
   handles it, so do not hand-roll requests to Yahoo endpoints.
