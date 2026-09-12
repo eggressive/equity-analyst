@@ -159,10 +159,10 @@ Honest gaps, in rough order of impact:
 
 ## Known failure modes, already handled
 
-Eight bugs shipped and were fixed during construction. Bugs 1-5 are Python errors in the
-metric and verification layers; 6 and 7 are LLM-protocol errors; 8 is an HTTP 403 from SEC
-EDGAR. `tests/` guards the first five. Bugs 6, 7 and 8 have no test and are recorded here
-only, which is a real gap in the suite rather than a claim of coverage.
+Nine bugs shipped and were fixed during construction. Bugs 1-5 and 9 are Python errors in
+the metric and verification layers; 6 and 7 are LLM-protocol errors; 8 is an HTTP 403 from
+SEC EDGAR. `tests/` guards bugs 1-5 and 9. Bugs 6, 7 and 8 have no test and are recorded
+here only, which is a real gap in the suite rather than a claim of coverage.
 
 1. **Wrong statement row.** Substring matching let `Other Non Operating Income
    Expenses` satisfy the needle `"Operating Income"`, so Reliance's operating margin
@@ -208,6 +208,24 @@ only, which is a real gap in the suite rather than a claim of coverage.
    at 7,076 tokens.
 8. **SEC 403.** EDGAR rejects a User-Agent whose contact is `dimitar@localhost` and
    accepts `dimitar@example.com`. Every SEC call failed silently until fixed.
+
+9. **Corporate action read as dilution.** `share_dilution_pct` compares the newest
+   annual share count against the oldest. yfinance restates the annual columns of a bonus
+   issue or split for the newer periods but not for the older ones, so a single series
+   mixes both bases: HDFCBANK.NS carries 7.107bn shares for FY2024 (pre-bonus) next to
+   15.319bn for FY2025 (post-bonus), and the metric read that as **+175.75%**, scoring the
+   `dilution` signal at -2 on the 1:1 bonus of 2025-08-26. The metric now refuses a change
+   that doubles or halves the count across the window, so the value goes missing: governance
+   coverage drops from 0.5 to 0.375 and the signal leaves the pillar instead of scoring a
+   corporate action. Real issuance and buybacks stay inside the band — in a 115-ticker
+   sample the widest are Realty Income at +48.5% (repeated equity raises) and AIG at -27.6%
+   (sustained buybacks) — and the guard changes no other ticker in that sample. Guarded by
+   `tests/test_metrics.py`, including the band boundaries and a rubric check that the
+   refused value is unavailable rather than scored. Two honest limits: the guard refuses
+   the artefact rather than computing the true value, which for HDFCBANK.NS is +0.57% for
+   the latest year; and a moderate artefact stays invisible to it, because the HDFC Bank
+   ADS listing HDB reports 37.67% where the latest year is 7.77%. Separating issuance from
+   a restated series needs the split history, which is not wired in yet.
 
 **Fabrication is treated as worse than absence.** A failed agent returns
 `status="unavailable"` with an error string, never plausible-looking prose: a truncated

@@ -299,14 +299,42 @@ def risk(b) -> dict:
     }
 
 
+# Share counts are compared first column against last over 3 to 5 annual columns. A
+# count that doubles or halves across that window is a corporate action, not issuance:
+# yfinance restates the newer annual columns of a bonus issue or split but not the older
+# ones, so one series mixes both bases (HDFCBANK.NS: 7.107bn pre-bonus next to 15.319bn
+# post-bonus, reported as +175.75%). Real issuance and real buybacks stay inside the band:
+# the widest in a 115-ticker sample are O at +48.5% (repeated equity raises) and AIG at
+# -27.6% (sustained buybacks).
+MAX_PLAUSIBLE_SHARE_RATIO = 2.0
+MIN_PLAUSIBLE_SHARE_RATIO = 0.5
+
+
 def governance(b) -> dict:
+    """Ownership metrics plus the corporate-action check on the share count.
+
+    `share_dilution_pct` is the change in average shares across the annual columns
+    yfinance returns: newest column against oldest. A change that doubles the count or
+    halves it is refused instead of reported, because that is how a bonus issue or a
+    split looks when yfinance restates the newer columns but not the older ones: the
+    series then mixes bases and the difference is not issuance. The refusal is ordinary
+    missing data, so governance coverage drops and the dilution signal leaves the pillar
+    rather than scoring a corporate action as dilution.
+    """
     q = b.quote
     inc = b.income
     shares_now = _row_series(inc, "Diluted Average Shares", "Basic Average Shares")
     dilution = None
     if shares_now is not None and len(shares_now.dropna()) > 1:
         s = shares_now.dropna()
-        dilution = _pct(float(s.iloc[0]) - float(s.iloc[-1]), float(s.iloc[-1]))
+        oldest, newest = float(s.iloc[-1]), float(s.iloc[0])
+        ratio = newest / oldest if oldest else None
+        dilution = (
+            _pct(newest - oldest, oldest)
+            if ratio is not None
+            and MIN_PLAUSIBLE_SHARE_RATIO < ratio < MAX_PLAUSIBLE_SHARE_RATIO
+            else None
+        )
 
     return {
         "held_by_institutions_pct": _r(
