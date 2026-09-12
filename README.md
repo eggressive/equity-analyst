@@ -207,7 +207,7 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    payload that the Bear receives. The Bear dropped from `unavailable` to 6 attacks
    at 7,076 tokens.
 8. **SEC 403.** EDGAR rejects a User-Agent whose contact is `dimitar@localhost` and
-   accepts `dimitar@example.com`. Every SEC call failed silently until fixed.
+   accepts `eggressive@example.com`. Every SEC call failed silently until fixed.
 
 9. **Corporate action read as dilution.** `share_dilution_pct` compares the newest
    annual share count against the oldest. yfinance restates the annual columns of a bonus

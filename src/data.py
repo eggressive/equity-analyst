@@ -21,9 +21,9 @@ import pandas as pd
 import yfinance as yf
 
 # SEC EDGAR returns 403 for a User-Agent whose contact is not a plausible email
-# (dimitar@localhost is rejected, dimitar@example.com is accepted). Keep a real
+# (dimitar@localhost is rejected, eggressive@example.com is accepted). Keep a real
 # domain in the contact string or every SEC call silently fails.
-SEC_UA = "EquityAnalyst-Research/0.1 (personal research; dimitar@example.com)"
+SEC_UA = "EquityAnalyst-Research/0.1 (personal research; eggressive@example.com)"
 
 
 def _num(x):
