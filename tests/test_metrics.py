@@ -12,6 +12,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import metrics  # noqa: E402
+import rubric  # noqa: E402
 
 # Mirrors the real yfinance row set that caused the Reliance bug.
 INCOME = pd.DataFrame(
@@ -110,6 +111,89 @@ def test_debt_fallback_keeps_short_term_debt():
                "Stockholders Equity"],
     )
     assert metrics.fundamentals(b)["debt_to_equity"] == 1.75  # (600 + 100) / 400
+
+
+# The real yfinance label sets that exposed this. Neither has an Operating Income row,
+# and in both cases the nearest label is a different line item.
+BRK_INCOME = pd.DataFrame(
+    {"2026": [410522000000.0, -5069000000.0, -4000.0],
+     "2025": [364482000000.0, -4500000000.0, -3800.0]},
+    index=["Total Revenue", "Net Non Operating Interest Income Expense",
+           "Interest Expense Non Operating"],
+)
+HDFC_INCOME = pd.DataFrame(
+    {"2026": [1925667800000.0, -36789600000.0],
+     "2025": [1800000000000.0, -30000000000.0]},
+    index=["Operating Revenue", "Other Non Operating Income Expenses"],
+)
+
+
+def test_negated_label_is_not_operating_income():
+    """BRK-B has no Operating Income row. "Net Non Operating Interest Income Expense"
+    contains the tokens but is a different line item; it used to be returned and scored
+    the operating_margin signal -2 against a fabricated -1.23%."""
+    assert metrics._pick_label(BRK_INCOME, "Operating Income", "EBIT") is None
+    assert metrics.fundamentals(FakeBundle(BRK_INCOME))["operating_margin_pct"] is None
+
+
+def test_other_non_operating_row_is_not_operating_income():
+    """HDFCBANK.NS has no Operating Income row either. "Other Non Operating Income
+    Expenses" used to be picked, for a fabricated margin of -1.91%."""
+    assert metrics._pick_label(HDFC_INCOME, "Operating Income", "EBIT") is None
+    assert metrics.fundamentals(FakeBundle(HDFC_INCOME))["operating_margin_pct"] is None
+
+
+def test_refused_row_reaches_the_rubric_as_unavailable_not_as_a_number():
+    """The rubric's rule is that absence dilutes coverage instead of being scored. A row
+    we refuse to pick must therefore arrive at the signal table as None."""
+    f = metrics.fundamentals(FakeBundle(BRK_INCOME))
+    assert rubric.build_signals({"fundamentals": f})["fundamentals"]["operating_margin"] is None
+
+
+def test_qualifying_suffix_is_still_accepted():
+    """Extra tokens are only a problem when they change the meaning. "As Reported"
+    qualifies the same quantity, so it must still match."""
+    df = pd.DataFrame({"2026": [1.0]}, index=["Operating Income As Reported"])
+    assert metrics._pick_label(df, "Operating Income") == "Operating Income As Reported"
+
+
+def test_needle_tokens_must_appear_as_a_contiguous_run():
+    """A needle must not be assembled across an unrelated word: "Operating Lease Income"
+    is not "Operating Income"."""
+    df = pd.DataFrame({"2026": [1.0]}, index=["Operating Lease Income"])
+    assert metrics._pick_label(df, "Operating Income") is None
+
+
+def test_absent_operating_income_falls_through_to_ebit():
+    """Live BRK-B has no Operating Income row but does carry EBIT, so the second needle
+    is what rescues the metric: -1.23% from the interest row became 21.32% = EBIT /
+    revenue. The fixture above models the tickers where EBIT is absent too."""
+    df = pd.DataFrame({"2026": [410522000000.0, 87528000000.0]},
+                      index=["Total Revenue", "EBIT"])
+    assert metrics._pick_label(df, "Operating Income", "EBIT") == "EBIT"
+    assert metrics.fundamentals(FakeBundle(df))["operating_margin_pct"] == 21.32
+
+
+ASML_CASHFLOW = pd.DataFrame(
+    {"2026": [12658500000.0, -1631200000.0, 11027300000.0]},
+    index=["Cash Flow From Continuing Operating Activities", "Capital Expenditure",
+           "Free Cash Flow"],
+)
+
+
+def test_continued_operations_cash_flow_is_operating_cash_flow():
+    """ASML labels its operating cash flow row "Cash Flow From Continuing Operating
+    Activities". That phrase does not contain "Operating Cash Flow" contiguously, so
+    without its own needle the cash conversion metric disappears (1.32 -> None) and one
+    rubric signal drops out with it."""
+    inc = pd.DataFrame({"2026": [28000000000.0, 9600000000.0]},
+                       index=["Total Revenue", "Net Income"])
+    b = FakeBundle(inc)
+    b.cashflow = ASML_CASHFLOW
+    f = metrics.fundamentals(b)
+    assert f["cash_conversion_ocf_over_ni"] == 1.32
+    # and the row really is operating cash flow: OCF + capex equals the statement's FCF
+    assert f["fcf"] == 11027300000.0
 
 
 if __name__ == "__main__":

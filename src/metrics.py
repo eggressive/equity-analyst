@@ -32,6 +32,19 @@ def _tokens(text) -> list[str]:
     return _WORD.findall(str(text).lower())
 
 
+# Tokens that turn a label into a different line item rather than a qualified version
+# of the same one. Both live wrong-row cases are covered by "non" and "other":
+# "Net Non Operating Interest Income Expense" (BRK-B) and
+# "Other Non Operating Income Expenses" (HDFCBANK.NS).
+MEANING_CHANGERS = frozenset({"non", "other", "excluding", "except", "before", "prior"})
+
+
+def _contains_run(haystack: list[str], needle: list[str]) -> bool:
+    """True if needle appears as a contiguous run of tokens in haystack."""
+    n = len(needle)
+    return any(haystack[i:i + n] == needle for i in range(len(haystack) - n + 1))
+
+
 def _pick_label(df: pd.DataFrame, *needles: str) -> str | None:
     """Find the statement row that best matches a needle.
 
@@ -42,11 +55,21 @@ def _pick_label(df: pd.DataFrame, *needles: str) -> str | None:
     Bear built an entire (wrong) thesis on it.
 
     Rules:
-      1. The needle must match whole words, so "EBIT" never matches "EBITDA".
-      2. All needle tokens must be present.
-      3. Among candidates, the fewest extra tokens wins, so "Operating Income"
-         beats "Other Non Operating Income Expenses".
-      4. An exact label match short-circuits everything.
+      1. Whole-word token matching, so "EBIT" never matches "EBITDA". The needle
+         tokens must also appear as a *contiguous run*, so "Operating Income" cannot
+         be assembled across an unrelated word ("Operating ... Income").
+      2. An exact label match short-circuits everything.
+      3. Extra tokens are allowed only when they qualify the same quantity. A
+         candidate carrying a meaning changer ("non", "other", "excluding", ...) is a
+         different line item and is refused. This is the rule that keeps a missing
+         Operating Income row missing: BRK-B's nearest label is
+         "Net Non Operating Interest Income Expense" and HDFCBANK.NS's is
+         "Other Non Operating Income Expenses". Accepting either one published an
+         operating margin of -1.23% / -1.91% and scored the pillar signal -2.
+      4. Among accepted candidates: a leading match wins, then the fewest extra
+         tokens, then the shorter label, then alphabetical order.
+      5. If nothing qualifies, return None. Absence is never filled by the closest
+         string: a missing row must leave the metric None so coverage can dilute.
     """
     if df is None or df.empty:
         return None
@@ -62,16 +85,15 @@ def _pick_label(df: pd.DataFrame, *needles: str) -> str | None:
 
         scored = []
         for lbl, tk in labels:
-            if all(t in tk for t in nt):
-                scored.append((len(tk) - len(nt), len(tk), lbl))
+            if not _contains_run(tk, nt):
+                continue
+            if (set(tk) - set(nt)) & MEANING_CHANGERS:
+                continue
+            leading = 0 if tk[:len(nt)] == nt else 1
+            scored.append((leading, len(tk) - len(nt), len(tk), lbl))
         if scored:
             scored.sort()
-            return scored[0][2]
-
-        # fall back to subsequence-free containment on the raw string
-        for lbl, _tk in labels:
-            if needle.lower() in lbl.lower():
-                return lbl
+            return scored[0][3]
     return None
 
 
@@ -137,7 +159,8 @@ def fundamentals(b) -> dict:
     equity = _row(bs, "Stockholders Equity", "Total Equity Gross Minority", "Common Stock Equity")
     assets = _row(bs, "Total Assets")
     cash = _row(bs, "Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments")
-    ocf = _row(cf, "Operating Cash Flow", "Total Cash From Operating Activities")
+    ocf = _row(cf, "Operating Cash Flow", "Total Cash From Operating Activities",
+               "Cash Flow From Continuing Operating Activities")
     capex = _row(cf, "Capital Expenditure")
     fcf = _row(cf, "Free Cash Flow")
     if fcf is None and ocf is not None and capex is not None:
