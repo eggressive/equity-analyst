@@ -68,12 +68,24 @@ intact in every change: the LLM layer interprets, the Python layer decides.
 - **GitHub work goes through the GitHub MCP tools, not the REST API.** When
   reading or reviewing PRs, issues, branches or checks, prefer the GitHub MCP
   server's tools over `gh` shell calls or hand-rolled `curl` against
-  `api.github.com`: the MCP surface gives structured output, handles
-  auth and pagination, and avoids parsing freeform CLI text. Raw `curl`
-  requests to the GitHub API are a last resort, only when an MCP tool for the
-  operation does not exist. Plain `git` commands (clone, commit, push, rebase)
+  `api.github.com`: it returns structured output instead of text to parse. Raw
+  `curl` requests to the GitHub API are a last resort, only when an MCP tool for
+  the operation does not exist. Plain `git` commands (clone, commit, push, rebase)
   are unaffected: this rule covers reading and commenting on GitHub state,
   not local repository work.
+
+  Three traps, all hit in practice:
+
+  - **The connection is per session.** A server added from the shell is visible to
+    new sessions and after `/reload`, not to the running one. Until the reload,
+    every call raises `KeyError: "MCP server '<name>' is not declared in user
+    settings"`. Reload rather than falling back to `gh` or `curl` silently.
+  - **Discover before calling.** Tool names and argument schemas come from
+    `mcp.list_tools("<server>")`: each entry carries `name`, `description` and the
+    `inputSchema` that is the real signature. The kernel's help covers only
+    `list_tools`, `call_tool`, `reload` and `close`, never a server's tools.
+  - **Parse the result.** `mcp.call_tool` returns a JSON string for this server,
+    not a dict.
 
 ## Writing style for every document you touch
 
