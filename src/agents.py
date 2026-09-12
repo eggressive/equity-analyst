@@ -168,8 +168,15 @@ def _extract_json(text: str) -> dict | None:
 COVERAGE_FIELDS = ("fundamentals", "valuation", "technicals", "risk", "governance")
 
 
-def _bundle_paths(bundle: dict) -> set[str]:
-    """Every key path that actually exists in the bundle, including nested ones.
+INDEX_RE = re.compile(r"\[(\d+)\]")
+
+
+def _bundle_paths(bundle: dict) -> tuple[set[str], dict[str, int]]:
+    """Every key path that actually exists in the bundle, plus the length of every list.
+
+    Returns (paths, lists). `paths` are canonical and index-free, so `extras.
+    institutional_holders.value` covers all eight holder rows. `lists` maps a list path
+    to its length, which is what lets a *cited* index be checked against reality.
 
     This replaced a flat allowlist plus prefix matching. The prefix check
     (`k.startswith(("extras.", "context.", ...))`) accepted any invented key under
@@ -179,6 +186,7 @@ def _bundle_paths(bundle: dict) -> set[str]:
     to something the bundle really contains.
     """
     paths: set[str] = set()
+    lists: dict[str, int] = {}
 
     def walk(prefix: str, obj):
         if isinstance(obj, dict):
@@ -187,6 +195,7 @@ def _bundle_paths(bundle: dict) -> set[str]:
                 paths.add(path)
                 walk(path, v)
         elif isinstance(obj, (list, tuple)):
+            lists[prefix] = len(obj)
             for item in obj:
                 walk(prefix, item)
 
@@ -208,7 +217,7 @@ def _bundle_paths(bundle: dict) -> set[str]:
                 walk(path, v)
         elif block is not None:
             paths.add(top)
-    return paths
+    return paths, lists
 
 
 def _normalise_key(key: str) -> str:
@@ -223,9 +232,29 @@ def _normalise_key(key: str) -> str:
     return k
 
 
+def _indices_resolve(key: str, lists: dict[str, int]) -> bool:
+    """Every [i] in a cited key must address a row that actually exists.
+
+    Paths are generated index-free, so without this check
+    `extras.institutional_holders[99].value` resolves to the generated
+    `extras.institutional_holders.value` and is accepted even though the bundle holds
+    eight holders. Real agents do cite the indexed form (eight times in
+    runs/AAPL_final.json), so the index has to be verified rather than stripped.
+    """
+    for m in INDEX_RE.finditer(key):
+        prefix = re.sub(r"\[\d+\]", "", key[: m.start()]).strip(".")
+        size = lists.get(prefix)
+        if size is None or int(m.group(1)) >= size:
+            return False
+    return True
+
+
 def _check_citations(data: dict, bundle: dict) -> list[str]:
-    allowed = _bundle_paths(bundle)
-    bare = {a.split(".")[-1] for a in allowed}
+    allowed, lists = _bundle_paths(bundle)
+    # Bare names are accepted only one level below their root: "beta", "market_cap" or
+    # "news_count" name a metric or field. Leaves nested inside a list item ("value",
+    # "holder") do not, so accepting them would let "value" stand in for a citation.
+    bare = {a.split(".")[-1] for a in allowed if a.count(".") == 1}
     cited = data.get("cited_metrics") or data.get("key_metrics") or []
     if isinstance(cited, str):
         # A single key, not a list of characters.
@@ -236,8 +265,12 @@ def _check_citations(data: dict, bundle: dict) -> list[str]:
     for c in cited:
         if not isinstance(c, str):
             continue
-        k = re.sub(r"\[\d+\]", "", _normalise_key(c))  # extras.holders[0].value
-        if k in allowed or k in bare:                   # exact path, or bare name
+        k = _normalise_key(c)
+        if INDEX_RE.search(k) and not _indices_resolve(k, lists):
+            bad.append(f"cited list index does not resolve: {c}")
+            continue
+        stripped = re.sub(r"\[\d+\]", "", k)          # extras.holders[0].value
+        if stripped in allowed or ("." not in k and k in bare):
             continue
         if k.startswith("pillar_coverage.") and k.split(".", 1)[1] in COVERAGE_FIELDS:
             continue

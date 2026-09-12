@@ -270,6 +270,36 @@ def test_citation_checker_accepts_a_single_string_key_not_its_characters():
     assert not agents._check_citations({"cited_metrics": "governance.beta"}, bundle)
 
 
+def test_citation_checker_rejects_out_of_range_list_indices():
+    """Paths are generated index-free, so an invented row index used to resolve:
+    `extras.institutional_holders[99].value` passed even when the bundle held one
+    holder. Agents do cite the indexed form, so the index is now validated."""
+    bundle = {
+        "pillars": {},
+        "context": {},
+        "extras": {"news_count": 1,
+                   "institutional_holders": [{"holder": "Blackrock", "value": 5.0}]},
+    }
+    assert not agents._check_citations(
+        {"cited_metrics": ["extras.institutional_holders[0].value"]}, bundle
+    )
+    for bad in ("extras.institutional_holders[9].value", "extras.news[0].title",
+                "extras.institutional_holders[0].market_value"):
+        assert agents._check_citations({"cited_metrics": [bad]}, bundle), bad
+
+
+def test_citation_checker_rejects_bare_nested_leaf_names():
+    """A bare name should mean a metric ("beta", "news_count"), not a leaf inside a
+    list item ("value", "holder"), which would let "value" stand in for a citation."""
+    bundle = {"pillars": {"governance": {"beta": 1.0}}, "context": {"market_cap": 1.0},
+              "extras": {"news_count": 1,
+                         "institutional_holders": [{"holder": "X", "value": 5.0}]}}
+    for bad in ("value", "holder", "pct"):
+        assert agents._check_citations({"cited_metrics": [bad]}, bundle), bad
+    for real in ("beta", "market_cap", "news_count", "institutional_holders"):
+        assert not agents._check_citations({"cited_metrics": [real]}, bundle), real
+
+
 if __name__ == "__main__":
     import traceback
 
