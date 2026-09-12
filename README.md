@@ -217,7 +217,10 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    `dilution` signal at -2 on the 1:1 bonus of 2025-08-26. The metric is now refused when
    two things hold together: the change doubles or halves the count across the window, and
    a material split or bonus (1.5:1 or larger, or its reverse) is dated inside the statement
-   window, read from the full split history rather than the two-year price window. The
+   window, read from the full split history rather than the two-year price window: in the
+   same sample 17 splits sit inside a statement window and 9 of them are invisible to a
+   two-year price series (NVDA 10:1 on 2024-06-10, NVO 2:1 on 2023-09-20, GE 1.281 and
+   1.253, MMM 1.196). The
    refusal is ordinary missing data, so governance coverage drops from 0.5 to 0.375 and the
    signal leaves the pillar instead of scoring a corporate action.
    **The split is required evidence, not a magnitude test.** A count that doubles with no
