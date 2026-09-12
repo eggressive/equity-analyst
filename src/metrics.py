@@ -299,23 +299,34 @@ def risk(b) -> dict:
     }
 
 
-# Share counts are compared first column against last across every annual column yfinance
-# returns, 3 to 5 years. Two things must both hold before a change is refused as a
-# corporate-action artefact: the change leaves the plausible band for issuance, and a
-# material split or bonus is dated inside the statement window. The split is the evidence,
-# because yfinance can restate the newer annual columns of a bonus and leave the older ones,
-# mixing two bases in one series (HDFCBANK.NS: 7.107bn pre-bonus next to 15.319bn post-bonus
-# after the 1:1 bonus of 2025-08-26, reported as +175.75%). That is not universal: only 1 of
-# the 17 in-window split events in a 115-ticker sample shows such a step, so the split is
-# required as evidence instead of assumed from the magnitude. Requiring the split keeps
-# genuine issuance scored: a count that doubles with no split in the window is dilution and
-# still scores -2. Real issuance and buybacks inside the band are unchanged either way: the
-# widest in a 115-ticker sample are O at +48.5% (repeated equity raises) and AIG at -27.6%
-# (sustained buybacks).
-MAX_PLAUSIBLE_SHARE_RATIO = 2.0    # doubled across the window
-MIN_PLAUSIBLE_SHARE_RATIO = 0.5    # halved across the window
-MATERIAL_SPLIT_RATIO = 1.5         # a 3:2 split or larger, or its reverse; spin-off
-                                   # adjustments of a few percent cannot rebase a series
+# Share counts are read as a trend across the annual columns, not first against last, and the
+# series is put back on one basis before it is measured. Three mechanisms replace the refusal;
+# README failure mode 9 carries the measurements.
+#
+#   Repair     divide out an adjacent step that a recorded split factor explains, so the two
+#              columns straddling a bonus land on one basis. The factor comes from the full
+#              split history (`TickerBundle.splits`), never from the two-year price window: 9
+#              of the 17 in-window splits in a 115-ticker sample are older than that window.
+#              Only ratios at or below 0.9 or at or above 1.5 count: near-1 ratios are
+#              distributions and ADR-ratio changes (SPGI 1.057, HON 0.9535, UL 0.888), and
+#              those cannot rebase a share count.
+#   Fallback   steps that stay implausible mean the columns are not on one basis, so the
+#              restated quarterly series is measured instead, over its shorter window. The
+#              same fallback covers a disagreement between the two series on one fiscal
+#              period, because the quarterly series is the restated one.
+#   Trend      the reported value is the change implied by the least-squares line through
+#              log(average shares) across the window, so one jumped column cannot set it.
+#
+# Issuance stays scored. A count that doubles with no split in the window is an all-stock
+# acquisition or equity financing: no factor explains it, so no mechanism touches it.
+MAX_PLAUSIBLE_SHARE_RATIO = 2.0    # doubled in one step
+MIN_PLAUSIBLE_SHARE_RATIO = 0.5    # halved in one step
+ROUNDING_ALLOWANCE = 0.05          # HDB's ADS change reads 0.502 against a recorded 0.5
+MATERIAL_SPLIT_RATIO = 1.5         # a 3:2 split or larger
+REVERSE_SPLIT_RATIO = 0.9          # at or below this a recorded factor is a reverse split
+SPLIT_MATCH_TOLERANCE = 0.10       # HDFCBANK's bonus step sits 7.75% above the recorded 2.0
+BASIS_DISAGREEMENT_PCT = 5.0       # annual against quarterly for the same fiscal period
+MIN_QUARTERS_FOR_TREND = 3         # two quarters are a comparison, not a trend
 
 
 def _naive_ts(ts):
@@ -324,58 +335,171 @@ def _naive_ts(ts):
     return ts.tz_localize(None) if ts.tzinfo is not None else ts
 
 
-def _split_inside_window(splits, columns) -> bool:
-    """True when a material split or bonus is dated inside the statement window.
+def _share_series(df):
+    """Average share counts from one statement, newest column first, or None."""
+    s = _row_series(df, "Diluted Average Shares", "Basic Average Shares")
+    if s is None:
+        return None
+    s = s.dropna()
+    return s if len(s) else None
 
-    That is the only case where the annual share count can mix two bases, so it is the
-    evidence required before an implausible change is refused. A missing or empty split
-    series returns False, which keeps the change and its issuance score.
+
+def _recorded_split_factors(splits, columns) -> list:
+    """Split and bonus factors dated inside the statement window, oldest first.
+
+    Near-1 ratios are dropped: yfinance records spin-off distributions and ADR-ratio changes
+    in the same series (SPGI 1.057, HON 0.9535, UL 0.888) and those cannot rebase a count.
     """
-    if splits is None or len(splits) == 0 or columns is None or len(columns) < 2:
-        return False
+    if splits is None or len(splits) == 0 or columns is None or len(columns) == 0:
+        return []
     dates = [_naive_ts(c) for c in columns]
     oldest, newest = min(dates), max(dates)
+    out = []
     for date, ratio in splits.items():
         try:
             ratio = float(ratio)
         except (TypeError, ValueError):
             continue
-        if ratio <= 0:
+        if ratio <= 0 or not (ratio <= REVERSE_SPLIT_RATIO or ratio >= MATERIAL_SPLIT_RATIO):
             continue
-        material = ratio >= MATERIAL_SPLIT_RATIO or ratio <= 1 / MATERIAL_SPLIT_RATIO
-        if material and oldest < _naive_ts(date) <= newest:
-            return True
-    return False
+        date = _naive_ts(date)
+        if oldest <= date <= newest:
+            out.append((date, ratio))
+    return sorted(out)
+
+
+def _step_matches_factor(step, factor) -> bool:
+    """True when a step between two columns is the recorded corporate action.
+
+    A restated column carries the action plus that year's issuance, so the step sits at the
+    factor or up to SPLIT_MATCH_TOLERANCE above it (HDFCBANK: 2.155 = 2.0 x 1.078). A step
+    below the factor is not explained by it: only part of the count moved.
+    """
+    carried = step / factor
+    if factor < 1:
+        return 1 - SPLIT_MATCH_TOLERANCE <= carried <= 1
+    return 1 <= carried <= 1 + SPLIT_MATCH_TOLERANCE
+
+
+def _repair_share_steps(series, factors):
+    """Put the columns on one basis by dividing out the steps a split factor explains."""
+    dates = [_naive_ts(i) for i in series.index]
+    values = [float(v) for v in series.values]
+    order = sorted(range(len(dates)), key=lambda i: dates[i])  # oldest first
+    scale = [1.0] * len(values)
+    repairs = 0
+    for k in range(1, len(order)):
+        previous, current = order[k - 1], order[k]
+        if not values[previous]:
+            continue
+        step = values[current] / values[previous]
+        matched = [(abs(step / f - 1), f) for _, f in factors if _step_matches_factor(step, f)]
+        if not matched:
+            continue
+        factor = min(matched)[1]
+        for i in order[:k]:
+            scale[i] *= factor
+        repairs += 1
+    return pd.Series([v * s for v, s in zip(values, scale)], index=series.index), repairs
+
+
+def _implausible_share_steps(series) -> list:
+    """Steps that no single year of issuance explains, rounding included.
+
+    ROUNDING_ALLOWANCE is there because recorded ratios are rounded: HDB's ADS change reads
+    0.502 on the share series, and 0.4% must not decide whether the columns mix bases.
+    """
+    dates = [_naive_ts(i) for i in series.index]
+    values = [float(v) for v in series.values]
+    order = sorted(range(len(dates)), key=lambda i: dates[i])
+    upper = MAX_PLAUSIBLE_SHARE_RATIO / (1 + ROUNDING_ALLOWANCE)
+    lower = MIN_PLAUSIBLE_SHARE_RATIO * (1 + ROUNDING_ALLOWANCE)
+    out = []
+    for k in range(1, len(order)):
+        previous, current = order[k - 1], order[k]
+        if not values[previous]:
+            continue
+        step = values[current] / values[previous]
+        if step >= upper or step <= lower:
+            out.append(round(step, 3))
+    return out
+
+
+def _share_trend_pct(series):
+    """Change implied by the least-squares line through log(average shares), in percent.
+
+    First column against last gives the same number for a series that grows steadily, and it
+    is damped when one column jumps, which is the point of reading a trend instead of two
+    endpoints.
+    """
+    if series is None or len(series) < 2:
+        return None
+    dates = [_naive_ts(i) for i in series.index]
+    values = [float(v) for v in series.values]
+    if any(v <= 0 for v in values) or len(set(dates)) < 2:
+        return None
+    t = [(d - min(dates)).days / 365.25 for d in dates]
+    y = [math.log(v) for v in values]
+    mean_t, mean_y = sum(t) / len(t), sum(y) / len(y)
+    spread = sum((x - mean_t) ** 2 for x in t)
+    if spread == 0:
+        return None
+    slope = sum((x - mean_t) * (v - mean_y) for x, v in zip(t, y)) / spread
+    return round((math.exp(slope * (max(t) - min(t))) - 1) * 100, 2)
+
+
+def _basis_disagreement_pct(annual, quarterly):
+    """Worst gap between the two share series for one fiscal period, in percent.
+
+    The quarterly series is the restated one, so a gap means the annual columns carry a basis
+    the quarterly series does not.
+    """
+    if annual is None or quarterly is None:
+        return None
+    restated = {_naive_ts(i): float(v) for i, v in quarterly.items()}
+    worst = None
+    for i, v in annual.items():
+        date = _naive_ts(i)
+        if restated.get(date):
+            gap = abs(float(v) / restated[date] - 1) * 100
+            worst = gap if worst is None else max(worst, gap)
+    return None if worst is None else round(worst, 2)
 
 
 def governance(b) -> dict:
-    """Ownership metrics plus the corporate-action check on the share count.
+    """Ownership metrics, including the trend in average shares.
 
-    `share_dilution_pct` is the change in average shares across the annual columns
-    yfinance returns: newest column against oldest. It is refused only when both hold: the
-    change doubles or halves the count, and a material split or bonus sits inside the
-    statement window. That is how a corporate action can look when yfinance restates the
-    newer columns but not the older ones: the series mixes bases and the difference is not
-    issuance. A large change with no split in the window is issuance and keeps its score.
-    The refusal is ordinary missing data, so governance coverage drops and the dilution
-    signal leaves the pillar rather than scoring a corporate action as dilution.
+    `share_dilution_pct` is the change implied by the least-squares line through log(average
+    shares) across the columns yfinance returns, after the series is put on one basis. The
+    annual columns are used first, repaired against the full split history. When steps stay
+    implausible, or when the annual and quarterly series disagree on one fiscal period, the
+    restated quarterly series is measured instead. A refusal survives for the case where
+    neither series is usable, and it is ordinary missing data: governance coverage drops and
+    the dilution signal leaves the pillar rather than scoring a corporate action as dilution.
     """
     q = b.quote
-    inc = b.income
-    shares_now = _row_series(inc, "Diluted Average Shares", "Basic Average Shares")
+    annual = _share_series(b.income)
+    quarterly = _share_series(getattr(b, "quarterly_income", None))
+    if annual is not None and len(annual) < 2:
+        annual = None
+    if quarterly is not None and len(quarterly) < MIN_QUARTERS_FOR_TREND:
+        quarterly = None
+
     dilution = None
-    if shares_now is not None and len(shares_now.dropna()) > 1:
-        s = shares_now.dropna()
-        oldest, newest = float(s.iloc[-1]), float(s.iloc[0])
-        ratio = newest / oldest if oldest else None
-        outside_band = ratio is not None and (
-            ratio >= MAX_PLAUSIBLE_SHARE_RATIO or ratio <= MIN_PLAUSIBLE_SHARE_RATIO
-        )
-        dilution = (
-            None
-            if outside_band and _split_inside_window(getattr(b, "splits", None), s.index)
-            else _pct(newest - oldest, oldest)
-        )
+    if annual is not None or quarterly is not None:
+        series = annual if annual is not None else quarterly
+        if annual is not None:
+            factors = _recorded_split_factors(getattr(b, "splits", None), annual.index)
+            repaired, _ = _repair_share_steps(annual, factors)
+            implausible = _implausible_share_steps(repaired)
+            gap = _basis_disagreement_pct(annual, quarterly)
+            mixed_bases = (
+                len(implausible) >= 2                    # two bases, not two corporate actions
+                or (len(implausible) == 1 and bool(factors))  # ambiguous beside a split
+                or (gap is not None and gap > BASIS_DISAGREEMENT_PCT)
+            )
+            series = quarterly if mixed_bases else repaired
+        dilution = _share_trend_pct(series)
 
     return {
         "held_by_institutions_pct": _r(

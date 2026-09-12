@@ -25,8 +25,9 @@ INCOME = pd.DataFrame(
 
 
 class FakeBundle:
-    def __init__(self, income, splits=None):
+    def __init__(self, income, splits=None, quarterly_income=None):
         self.income = income
+        self.quarterly_income = pd.DataFrame() if quarterly_income is None else quarterly_income
         self.balance = pd.DataFrame()
         self.cashflow = pd.DataFrame()
         self.quote = {}
@@ -197,24 +198,121 @@ def test_continued_operations_cash_flow_is_operating_cash_flow():
     assert f["fcf"] == 11027300000.0
 
 
+# The live HDFCBANK.NS annual columns, exact: FY2026 and FY2025 are restated to the
+# post-bonus basis, FY2024 and FY2023 are not.
 HDFC_ANNUAL = pd.DataFrame(
-    {"2026": [15406000000.0], "2025": [15319000000.0], "2024": [7107000000.0],
-     "2023": [5587000000.0]},
+    {"2026-03-31": [15406371571.0], "2025-03-31": [15318868212.0],
+     "2024-03-31": [7107452428.0], "2023-03-31": [5587173328.0]},
+    index=["Diluted Average Shares"],
+)
+HDFC_SPLITS = pd.Series([5.0, 2.0, 2.0],
+                        index=pd.to_datetime(["2011-07-14", "2019-09-19", "2025-08-26"]))
+
+
+def test_bonus_step_is_repaired_instead_of_refused():
+    """HDFCBANK.NS: yfinance restates the annual columns after the August 2025 1:1 bonus for
+    FY2025 and FY2026 but not for FY2024 and FY2023, so first against last reads 7.107bn ->
+    15.406bn = +175.75% and a corporate action scores as dilution. The observed step is 2.155
+    against a recorded 2.0, and the extra 7.8% is that year's real issuance, so the two
+    pre-bonus columns are rebased and the metric reports what is left: the merger, +36.56%
+    across the window, which keeps its -2."""
+    gov = metrics.governance(FakeBundle(HDFC_ANNUAL, splits=HDFC_SPLITS))
+    assert gov["share_dilution_pct"] == 36.56
+    assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == -2
+
+
+TRV_ANNUAL = pd.DataFrame(
+    {"2025-12-31": [227600000.0], "2024-12-31": [23110000000.0],
+     "2023-12-31": [232200000.0], "2022-12-31": [239700000.0]},
+    index=["Diluted Average Shares"],
+)
+TRV_QUARTERLY = pd.DataFrame(
+    {"2026-06-30": [213600000.0], "2026-03-31": [218400000.0], "2025-12-31": [224000000.0],
+     "2025-09-30": [227500000.0], "2025-06-30": [229300000.0]},
     index=["Diluted Average Shares"],
 )
 
 
-def test_mixed_basis_share_series_is_not_reported_as_dilution():
-    """HDFCBANK.NS: yfinance restates the annual columns after the August 2025 1:1 bonus
-    for FY2025 and FY2026 but not for FY2024 and FY2023, so first-against-last reads
-    7.107bn -> 15.406bn = +175.75% and the dilution signal scores -2 on a corporate
-    action. The metric must be refused instead, and the split history is the evidence
-    that this is a corporate action rather than issuance."""
-    hdfc_splits = pd.Series([5.0, 2.0, 2.0],
-                            index=pd.to_datetime(["2011-07-14", "2019-09-19", "2025-08-26"]))
-    gov = metrics.governance(FakeBundle(HDFC_ANNUAL, splits=hdfc_splits))
+def test_columns_on_different_bases_fall_back_to_the_restated_quarterly_series():
+    """TRV: the 2024 annual column is 23.11bn where the years either side are 0.23bn, so one
+    step reads as 99x and the next as 0.01x. No split explains either step and no single year
+    of issuance produces them, so the annual columns are not one series. The restated
+    quarterly columns are measured instead: -7.04% across their shorter window, a buyback."""
+    b = FakeBundle(TRV_ANNUAL, quarterly_income=TRV_QUARTERLY)
+    gov = metrics.governance(b)
+    assert gov["share_dilution_pct"] == -7.04
+    assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == 2
+
+
+HDB_ANNUAL = pd.DataFrame(
+    {"2025-03-31": [5106000000.0], "2024-03-31": [4738000000.0],
+     "2023-03-31": [1862000000.0], "2022-03-31": [3709000000.0]},
+    index=["Diluted Average Shares"],
+)
+HDB_QUARTERLY = pd.DataFrame({"2025-06-30": [2566000000.0], "2024-12-31": [2559000000.0]},
+                             index=["Diluted Average Shares"])
+HDB_SPLITS = pd.Series([5.0, 2.0, 2.0],
+                       index=pd.to_datetime(["2011-07-25", "2019-09-26", "2025-09-08"]))
+
+
+def test_refusal_survives_when_neither_series_is_usable():
+    """HDB, an ADS listing: yfinance mixes per-ADS and per-share counts across the annual
+    columns (3.709bn -> 1.862bn -> 4.738bn), and the 2025-09-08 factor of 2.0 sits after the
+    newest column, so no recorded action explains either step. The quarterly series has two
+    columns, which is a comparison rather than a trend. Refuse, and let coverage dilute."""
+    b = FakeBundle(HDB_ANNUAL, splits=HDB_SPLITS, quarterly_income=HDB_QUARTERLY)
+    gov = metrics.governance(b)
     assert gov["share_dilution_pct"] is None
     assert rubric.build_signals({"governance": gov})["governance"]["dilution"] is None
+
+
+XOM_ANNUAL = pd.DataFrame(
+    {"2025-12-31": [4305100000.0], "2024-12-31": [4298000000.0],
+     "2023-12-31": [4052000000.0], "2022-12-31": [4205000000.0]},
+    index=["Diluted Average Shares"],
+)
+AAPL_ANNUAL = pd.DataFrame(
+    {"2025-09-30": [15005000000.0], "2024-09-30": [15408000000.0],
+     "2023-09-30": [15813000000.0], "2022-09-30": [16326000000.0]},
+    index=["Diluted Average Shares"],
+)
+
+
+def test_trend_reading_survives_one_jumped_column():
+    """XOM: first against last reads +2.38% because the 2022 column is high, while the line
+    through the four columns says +3.96%: the 2024 issue is what the endpoints hide. The
+    trend is the reading that catches it, and it crosses the -1 band into -2."""
+    gov = metrics.governance(FakeBundle(XOM_ANNUAL))
+    assert gov["share_dilution_pct"] == 3.96
+    assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == -2
+
+
+def test_trend_equals_the_endpoint_change_for_a_steady_series():
+    """AAPL buys back steadily, so the fitted trend and first against last agree to within
+    0.1pp: -8.03% against -8.09%. A definition change that moves this case would be a bug."""
+    gov = metrics.governance(FakeBundle(AAPL_ANNUAL))
+    assert gov["share_dilution_pct"] == -8.03
+    assert abs(gov["share_dilution_pct"] - (-8.09)) < 0.1
+    assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == 2
+
+
+BASIS_ANNUAL = pd.DataFrame(
+    {"2025-03-31": [1000000000.0], "2024-03-31": [1000000000.0], "2023-03-31": [1000000000.0]},
+    index=["Diluted Average Shares"],
+)
+BASIS_QUARTERLY = pd.DataFrame(
+    {"2025-03-31": [1120000000.0], "2024-12-31": [1100000000.0], "2024-09-30": [1080000000.0]},
+    index=["Diluted Average Shares"],
+)
+
+
+def test_annual_and_quarterly_disagreement_prefers_the_quarterly_series():
+    """The basis check: the annual column for a fiscal period is 12% below the quarterly
+    column for the same period, so the annual series carries a basis the restated quarterly
+    series does not. The quarterly series is what gets measured."""
+    b = FakeBundle(BASIS_ANNUAL, quarterly_income=BASIS_QUARTERLY)
+    gov = metrics.governance(b)
+    assert gov["share_dilution_pct"] == 3.7
 
 
 def test_real_issuance_inside_the_band_keeps_its_number():
@@ -236,15 +334,6 @@ def test_real_buyback_inside_the_band_keeps_its_number():
     assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == 2
 
 
-def test_reverse_split_shaped_drop_is_refused():
-    """A count that halves or falls further over the window is the same artefact in the
-    other direction (a reverse split restates the newer columns upward)."""
-    df = pd.DataFrame({"2026": [1000000000.0], "2022": [20000000000.0]},
-                      index=["Diluted Average Shares"])
-    reverse = pd.Series([0.1], index=pd.to_datetime(["2025-01-15"]))
-    assert metrics.governance(FakeBundle(df, splits=reverse))["share_dilution_pct"] is None
-
-
 DOUBLED = pd.DataFrame({"2026": [2000000000.0], "2022": [1000000000.0]},
                        index=["Diluted Average Shares"])
 JUST_UNDER_DOUBLE = pd.DataFrame({"2026": [1990000000.0], "2022": [1000000000.0]},
@@ -256,15 +345,22 @@ OUTSIDE_WINDOW = pd.Series([2.0], index=pd.to_datetime(["2019-06-01"]))
 SMALL_ADJUSTMENT = pd.Series([1.06], index=pd.to_datetime(["2024-06-01"]))
 
 
-def test_guard_boundaries_are_exact_with_split_evidence():
-    """Exactly doubling or exactly halving is refused when the window holds a material
-    split; just inside the band is kept."""
+def test_doubling_the_recorded_factor_explains_is_repaired_to_the_factor():
+    """A step that is exactly the recorded 2.0 is the split, so the older column is rebased
+    and what remains is nothing: 0.0%, not a refusal and not 100% of dilution."""
+    gov = metrics.governance(FakeBundle(DOUBLED, splits=INSIDE_WINDOW))
+    assert gov["share_dilution_pct"] == 0.0
+    assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == 0
+
+
+def test_step_below_the_recorded_factor_is_ambiguous_not_issuance():
+    """1.99 against a recorded 2.0 is not the split plus issuance, and it is not a doubling
+    either: only part of the count moved. Beside a recorded split the honest answer is a
+    refusal, so coverage dilutes instead of a confident 99%."""
     assert metrics.governance(
-        FakeBundle(DOUBLED, splits=INSIDE_WINDOW))["share_dilution_pct"] is None
+        FakeBundle(JUST_UNDER_DOUBLE, splits=INSIDE_WINDOW))["share_dilution_pct"] is None
     assert metrics.governance(
         FakeBundle(HALVED, splits=INSIDE_WINDOW))["share_dilution_pct"] is None
-    assert metrics.governance(
-        FakeBundle(JUST_UNDER_DOUBLE, splits=INSIDE_WINDOW))["share_dilution_pct"] == 99.0
 
 
 def test_doubling_without_a_split_keeps_the_issuance_score():
@@ -274,6 +370,15 @@ def test_doubling_without_a_split_keeps_the_issuance_score():
     gov = metrics.governance(FakeBundle(DOUBLED))
     assert gov["share_dilution_pct"] == 100.0
     assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == -2
+
+
+def test_reverse_split_shaped_drop_is_refused():
+    """A count that halves or falls further over the window is the same artefact in the
+    other direction (a reverse split restates the newer columns upward)."""
+    df = pd.DataFrame({"2026": [1000000000.0], "2022": [20000000000.0]},
+                      index=["Diluted Average Shares"])
+    reverse = pd.Series([0.1], index=pd.to_datetime(["2025-01-15"]))
+    assert metrics.governance(FakeBundle(df, splits=reverse))["share_dilution_pct"] is None
 
 
 def test_split_outside_the_statement_window_is_not_evidence():
