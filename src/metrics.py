@@ -303,9 +303,11 @@ def risk(b) -> dict:
 # returns, 3 to 5 years. Two things must both hold before a change is refused as a
 # corporate-action artefact: the change leaves the plausible band for issuance, and a
 # material split or bonus is dated inside the statement window. The split is the evidence,
-# because yfinance restates the newer annual columns of a bonus but not the older ones, so
-# one series mixes both bases (HDFCBANK.NS: 7.107bn pre-bonus next to 15.319bn post-bonus
-# after the 1:1 bonus of 2025-08-26, reported as +175.75%). Requiring the split keeps
+# because yfinance can restate the newer annual columns of a bonus and leave the older ones,
+# mixing two bases in one series (HDFCBANK.NS: 7.107bn pre-bonus next to 15.319bn post-bonus
+# after the 1:1 bonus of 2025-08-26, reported as +175.75%). That is not universal: only 1 of
+# the 17 in-window split events in a 115-ticker sample shows such a step, so the split is
+# required as evidence instead of assumed from the magnitude. Requiring the split keeps
 # genuine issuance scored: a count that doubles with no split in the window is dilution and
 # still scores -2. Real issuance and buybacks inside the band are unchanged either way: the
 # widest in a 115-ticker sample are O at +48.5% (repeated equity raises) and AIG at -27.6%
@@ -352,8 +354,8 @@ def governance(b) -> dict:
     `share_dilution_pct` is the change in average shares across the annual columns
     yfinance returns: newest column against oldest. It is refused only when both hold: the
     change doubles or halves the count, and a material split or bonus sits inside the
-    statement window. That is how a corporate action looks when yfinance restates the newer
-    columns but not the older ones: the series mixes bases and the difference is not
+    statement window. That is how a corporate action can look when yfinance restates the
+    newer columns but not the older ones: the series mixes bases and the difference is not
     issuance. A large change with no split in the window is issuance and keeps its score.
     The refusal is ordinary missing data, so governance coverage drops and the dilution
     signal leaves the pillar rather than scoring a corporate action as dilution.
