@@ -20,10 +20,11 @@ from datetime import datetime, timezone
 import pandas as pd
 import yfinance as yf
 
-# SEC EDGAR returns 403 for a User-Agent whose contact is not a plausible email
-# (dimitar@localhost is rejected, dimitar@example.com is accepted). Keep a real
-# domain in the contact string or every SEC call silently fails.
-SEC_UA = "EquityAnalyst-Research/0.1 (personal research; dimitar@example.com)"
+# SEC EDGAR answers 403 with "Your Request Originates from an Undeclared Automated Tool"
+# for library and bot default User-Agents (curl, Wget, Python-urllib, python-requests).
+# A descriptive product token passes and the contact is not validated, but SEC's policy
+# asks for one, so keep it. Nothing in the pipeline calls SEC yet.
+SEC_UA = "EquityAnalyst-Research/0.1 (personal research; eggressive@example.com)"
 
 
 def _num(x):

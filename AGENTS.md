@@ -65,6 +65,45 @@ intact in every change: the LLM layer interprets, the Python layer decides.
 - `runs/` JSON artefacts are the ground truth for what a code change did.
   Before and after a metric or rubric change, diff the artefacts, not just the
   scores.
+- **GitHub work goes through the GitHub MCP tools, not the REST API.** When
+  reading or reviewing PRs, issues, branches or checks, prefer the GitHub MCP
+  server's tools over `gh` shell calls or hand-rolled `curl` against
+  `api.github.com`: it returns structured output instead of text to parse. Raw
+  `curl` requests to the GitHub API are a last resort, only when an MCP tool for
+  the operation does not exist. Plain `git` commands (clone, commit, push, rebase)
+  are unaffected: this rule covers reading and commenting on GitHub state,
+  not local repository work.
+
+  Three traps, all hit in practice:
+
+  - **The connection is per session.** A server added from the shell is visible to
+    new sessions and after `/reload`, not to the running one. Until the reload,
+    every call raises `KeyError: "MCP server '<name>' is not declared in user
+    settings"`. Reload rather than falling back to `gh` or `curl` silently.
+  - **Discover before calling.** Tool names and argument schemas come from
+    `mcp.list_tools("<server>")`: each entry carries `name`, `description` and the
+    `inputSchema` that is the real signature. The kernel's help covers only
+    `list_tools`, `call_tool`, `reload` and `close`, never a server's tools.
+  - **Parse the result.** `mcp.call_tool` returns a JSON string for this server,
+    not a dict.
+
+## Writing style for every document you touch
+
+Applies to `AGENTS.md`, `README.md`, docstrings, PR descriptions and code
+comments alike.
+
+- **Formatting:** bold lead-ins on bullets, backticks for commands and paths,
+  fenced blocks with a language tag.
+- **Voice:** terse and opinionated. Name unknowns as unknowns rather than
+  writing around them, and state caveats and traps explicitly.
+- **One reason per claim, at most.** The failure mode is a justifying clause
+  on every sentence: enjoyable once, exhausting at volume, and it buries
+  the decisions.
+- **Rationale only where contested or counter-intuitive; elsewhere state it
+  and move on.** Prefer a table to a paragraph.
+- **Relative links between documents, including to anchors:** `[Part 5](GitHub/copilot-pilot.md#part-5--decide)`.
+- **Don't duplicate content across documents.** Link to the one that owns
+  the topic.
 
 ## Known live defects and owner decisions (do not fix unilaterally)
 
@@ -87,8 +126,18 @@ before code changes:
 
 ## Data-source pitfalls (verified on this machine)
 
-- SEC EDGAR rejects `dimitar@localhost` in the User-Agent; use
-  `dimitar@example.com` or any RFC-compliant contact. A 403 here is silent.
+- SEC EDGAR blocks undeclared automated tools: `curl/8.18.0`, `Wget2/2.2.1`,
+  `Python-urllib/3.14` and `python-requests/2.34.3` return 403 on `data.sec.gov` and
+  `www.sec.gov`, while a descriptive User-Agent stays at 200. The two hosts then
+  differ: on `data.sec.gov` (the only SEC host this repo calls, in `src/data.py`)
+  the contact is not validated, `dimitar@localhost` included; on `www.sec.gov` a
+  plausible email is required and `localhost` returns 403. Keep one anyway, for
+  SEC fair-access policy rather than for the 403. Re-check:
+
+  ```bash
+  curl -H "User-Agent: EquityAnalyst-Research/0.1 (personal research; eggressive@example.com)" \
+    https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json
+  ```
 - NSE India direct returns 403; India coverage comes through yfinance `.NS`.
 - Yahoo's `quoteSummary` is crumb-gated (401) for raw HTTP; the library
   handles it, so do not hand-roll requests to Yahoo endpoints.
