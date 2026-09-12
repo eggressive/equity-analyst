@@ -68,6 +68,50 @@ def test_total_debt_fallback_uses_balance_sheet_only():
     assert p["debt_to_equity"] is None  # no balance sheet in the fake bundle
 
 
+def test_dividend_yield_is_not_scaled_twice():
+    """yfinance 1.7 returns dividendYield already as a percent. AAPL reports 0.33 for a
+    ~0.33% yield; multiplying by 100 published 33.0% as a real metric, and every agent in
+    the run spent a line treating it as a data defect."""
+    b = FakeBundle(INCOME)
+    b.quote = {"dividendYield": 0.33, "dividendRate": 1.08, "regularMarketPrice": 332.27}
+    assert metrics.valuation(b)["dividend_yield_pct"] == 0.33
+
+
+def test_dividend_yield_fraction_style_provider_is_still_rescaled():
+    """Older yfinance builds returned a fraction. The cross-check against
+    dividendRate/price must keep working for that shape too."""
+    b = FakeBundle(INCOME)
+    b.quote = {"dividendYield": 0.0033, "dividendRate": 1.08, "regularMarketPrice": 332.27}
+    assert metrics.valuation(b)["dividend_yield_pct"] == 0.33
+
+
+def test_dividend_yield_without_cross_check_uses_percent_semantics():
+    b = FakeBundle(INCOME)
+    b.quote = {"dividendYield": 2.4}
+    assert metrics.valuation(b)["dividend_yield_pct"] == 2.4
+
+
+def test_missing_debt_rows_do_not_score_as_debt_free():
+    """Absence must never score. `or 0` used to turn a missing debt row into a real zero,
+    and the leverage table maps 0.0 to +2, the most bullish value it can emit."""
+    b = FakeBundle(INCOME)
+    b.balance = pd.DataFrame({"2026": [500.0, 60.0]},
+                             index=["Total Assets", "Stockholders Equity"])
+    assert metrics.fundamentals(b)["debt_to_equity"] is None
+
+
+def test_debt_fallback_keeps_short_term_debt():
+    """The combined capital-lease row excludes current debt and used to overwrite the
+    long+short sum, understating leverage on any balance sheet without a Total Debt row."""
+    b = FakeBundle(INCOME)
+    b.balance = pd.DataFrame(
+        {"2026": [600.0, 100.0, 400.0]},
+        index=["Long Term Debt And Capital Lease Obligation", "Current Debt",
+               "Stockholders Equity"],
+    )
+    assert metrics.fundamentals(b)["debt_to_equity"] == 1.75  # (600 + 100) / 400
+
+
 if __name__ == "__main__":
     import traceback
 

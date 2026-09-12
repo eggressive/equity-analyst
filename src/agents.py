@@ -162,16 +162,53 @@ def _extract_json(text: str) -> dict | None:
         return None
 
 
-def _valid_keys(bundle: dict) -> set[str]:
-    keys = set()
-    for group, vals in bundle.get("pillars", {}).items():
-        for k in vals:
-            keys.add(f"{group}.{k}")
-    for k in bundle.get("context", {}):
-        keys.add(f"context.{k}")
-    for k in bundle.get("extras", {}):
-        keys.add(f"extras.{k}")
-    return keys
+# The five pillars the bundle always reports coverage for. Citing one of these is
+# legitimate provenance, so "pillar_coverage.governance" is accepted even when a
+# test fixture omits the block. Any other sub-field is not a real key.
+COVERAGE_FIELDS = ("fundamentals", "valuation", "technicals", "risk", "governance")
+
+
+def _bundle_paths(bundle: dict) -> set[str]:
+    """Every key path that actually exists in the bundle, including nested ones.
+
+    This replaced a flat allowlist plus prefix matching. The prefix check
+    (`k.startswith(("extras.", "context.", ...))`) accepted any invented key under
+    those roots, so `context.peer_median_pe` or `extras.analyst_consensus_eps` - the
+    exact peer/consensus data the bundle documents as absent - passed citation
+    checking while being fabricated. A key is now valid only if the path resolves
+    to something the bundle really contains.
+    """
+    paths: set[str] = set()
+
+    def walk(prefix: str, obj):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                path = f"{prefix}.{k}" if prefix else str(k)
+                paths.add(path)
+                walk(path, v)
+        elif isinstance(obj, (list, tuple)):
+            for item in obj:
+                walk(prefix, item)
+
+    # Pillar values are cited as "group.key" (governance.beta), not "pillars.group.key",
+    # which is what _normalise_key strips toward, so the prefix is dropped here.
+    for group, vals in (bundle.get("pillars") or {}).items():
+        if not isinstance(vals, dict):
+            continue
+        for k, v in vals.items():
+            path = f"{group}.{k}"
+            paths.add(path)
+            walk(path, v)
+    for top in ("context", "extras", "pillar_coverage", "data_quality"):
+        block = bundle.get(top)
+        if isinstance(block, dict):
+            for k, v in block.items():
+                path = f"{top}.{k}"
+                paths.add(path)
+                walk(path, v)
+        elif block is not None:
+            paths.add(top)
+    return paths
 
 
 def _normalise_key(key: str) -> str:
@@ -187,20 +224,22 @@ def _normalise_key(key: str) -> str:
 
 
 def _check_citations(data: dict, bundle: dict) -> list[str]:
-    allowed = _valid_keys(bundle)
+    allowed = _bundle_paths(bundle)
+    bare = {a.split(".")[-1] for a in allowed}
     cited = data.get("cited_metrics") or data.get("key_metrics") or []
-    if isinstance(cited, dict):
+    if isinstance(cited, str):
+        # A single key, not a list of characters.
+        cited = [cited]
+    elif isinstance(cited, dict):
         cited = list(cited.keys()) + [v for v in cited.values() if isinstance(v, str)]
     bad = []
     for c in cited:
         if not isinstance(c, str):
             continue
-        k = _normalise_key(c)
-        if k in allowed or k.startswith(
-            ("extras.", "context.", "data_quality.", "pillar_coverage.")
-        ):
+        k = re.sub(r"\[\d+\]", "", _normalise_key(c))  # extras.holders[0].value
+        if k in allowed or k in bare:                   # exact path, or bare name
             continue
-        if k in {a.split(".")[-1] for a in allowed}:  # bare metric name, e.g. "beta"
+        if k.startswith("pillar_coverage.") and k.split(".", 1)[1] in COVERAGE_FIELDS:
             continue
         bad.append(f"uncited/unknown metric key: {c}")
     return bad
