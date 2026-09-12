@@ -1,0 +1,12 @@
+# Tested on Python 3.11 and 3.14.
+# Data layer: no API keys required.
+yfinance==1.7.0
+pandas==3.0.5
+
+# yfinance uses curl_cffi for Yahoo's crumb/cookie handshake. Without it the
+# quoteSummary endpoint returns 401 Invalid Crumb.
+curl_cffi>=0.7
+
+# LLM layer: any OpenAI-compatible endpoint. Only needed for the agent stages;
+# `analyze.py --no-llm` runs the deterministic pipeline with no LLM at all.
+openai>=1.100,<2

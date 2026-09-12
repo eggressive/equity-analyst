@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Secrets. The pipeline reads OLLAMA_API_KEY from the environment; never commit one.
+.env
+.env.*
+!.env.example
+
+# Run logs and superseded artefacts. The three canonical run JSONs referenced by
+# the README are tracked on purpose (`runs/AAPL_final.json` and friends).
+runs/*.log
+runs/archive/
+runs/*_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T*.json
+runs/*_partial.json
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store

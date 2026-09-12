@@ -1,0 +1,198 @@
+# equity-analyst
+
+A local, open-source rebuild of the pipeline described in Shobhit Agarwal's
+"I Built 9 AI Agents That Argue Over Every Stock, So You Don't Have To"
+(EquityAnalyst.online). Runs on Hermes with free data sources and Ollama Cloud models.
+
+## The pipeline
+
+```
+Python calculates  ->  agents interpret  ->  Bull argues  ->  Bear attacks
+                   ->  verification checks  ->  deterministic rubric scores
+```
+
+The rubric verdict is final. No agent can overrule it. That is the whole point:
+the LLM layer generates interpretation, the Python layer generates the decision.
+
+## Modules
+
+| File | Role | LLM involved |
+|------|------|--------------|
+| `src/data.py` | Evidence fetch: yfinance (US + NSE), SEC EDGAR XBRL. Every value carries a source string. | No |
+| `src/metrics.py` | 5 metric pillars: fundamentals, valuation, technicals, risk, governance. | No |
+| `src/rubric.py` | Signal tables, two-horizon weights, coverage-diluted scoring. | No |
+| `src/verify.py` | Matches every number an agent emits to an evidence value or a derived ratio. | No |
+| `src/agents.py` | 9 specialists, Bull, Bear, Judge. Strict JSON, citation checking, fallback model. | Yes |
+| `analyze.py` | Orchestration, run artefacts, resume. | No |
+| `tests/test_rubric.py` | Determinism and sign-direction invariants. | No |
+
+## Install
+
+```bash
+git clone <repo-url> && cd equity-analyst
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Python 3.11+. Only the agent stages need a credential; the deterministic pipeline
+runs with none.
+
+```bash
+export OLLAMA_API_KEY=...            # any OpenAI-compatible endpoint
+cp .env.example .env                 # optional, documents the overrides
+```
+
+## Usage
+
+```bash
+set -a; . ~/.hermes/.env; set +a          # OLLAMA_API_KEY
+
+~/venv/bin/python analyze.py AAPL                  # full pipeline
+~/venv/bin/python analyze.py RELIANCE.NS           # NSE
+~/venv/bin/python analyze.py AAPL --no-llm         # deterministic only, zero API cost
+~/venv/bin/python analyze.py AAPL --resume runs/AAPL_partial.json   # reuse ok stages
+~/venv/bin/python tests/test_rubric.py
+```
+
+Env overrides: `EA_MODEL` (default `deepseek-v4.1-flash:cloud`),
+`EA_FALLBACK_MODEL` (default `glm-5.3:cloud`), `EA_BASE_URL`.
+
+No Hermes dependency: the project imports no Hermes modules and reads no Hermes
+config. Point `EA_BASE_URL` at any OpenAI-compatible server, or use `--no-llm` to
+skip the LLM entirely.
+
+
+## Scoring
+
+Signal scale is -2..+2. Pillar score is the mean of its *available* signals;
+missing signals are excluded rather than scored zero, and the pillar's coverage
+fraction dilutes its weight. If total confidence falls below 0.45 the result is
+`INSUFFICIENT_DATA` instead of a guess.
+
+Two horizons with different weights:
+
+- `SHORT_TERM` (2-8 weeks): technicals 0.35, risk 0.30, valuation 0.15, fundamentals 0.10, governance 0.10
+- `LONG_TERM` (3-5 years): fundamentals 0.32, valuation 0.26, governance 0.20, risk 0.15, technicals 0.07
+
+## Verified runs (2026-09-12, current code)
+
+| Symbol | SHORT_TERM | LONG_TERM | Agents | Grounding | Unmatched | Time |
+|---|---|---|---|---|---|---|
+| AAPL | NEUTRAL +0.294 | BULLISH +0.458 | 9/9 | 0.968 | 0 | 51s |
+| RELIANCE.NS | BULLISH +0.500 | BULLISH +0.734 | 9/9 | 0.977 | 0 | 140s |
+| TCS.NS | NEUTRAL +0.246 | BULLISH +0.796 | 9/9 | 0.966 | 0 | 276s |
+
+Artefacts: `runs/AAPL_final.json`, `runs/RELIANCE_full.json`, `runs/TCS_full.json`.
+Every figure in this README is read back from those files, not transcribed by hand.
+
+The Bear earned its place on AAPL: it dismantled the "best-in-class margins" claim
+(the bundle contains no peer benchmark, so the claim is unsupported), the 151.91% ROE
+(a capital-structure artifact of a buyback-shrunken equity base plus 1.34 D/E), and
+momentum confirmation (RSI 70.62 with volume 21.86% below its 20-day average). The
+rubric verdict was identical before and after the debate, on every ticker.
+
+**Unmatched numbers are zero across all three tickers**, meaning every figure any agent
+wrote resolved either to an evidence value or to arithmetic over evidence values.
+
+
+
+## What this is missing versus EquityAnalyst.online
+
+Honest gaps, in rough order of impact:
+
+1. **Peer and historical multiples.** The system can compute AAPL's PE but not
+   AAPL's PE *versus its own 5-year range or versus peers*. This is the single
+   biggest analytical hole: both the Bull and the Bear flagged it unprompted.
+2. **Consensus estimates.** `forwardPE` comes from Yahoo; there is no real analyst
+   consensus series, so forward-looking claims rest on one provider number.
+3. **Earnings transcript and filing text.** Founder Desk and Earnings Call
+   Analyzer need document ingestion (10-K/Q + transcripts) and a retrieval layer.
+   Not started. SEC EDGAR is wired up for XBRL numbers only, not prose.
+4. **News sentiment actually scored.** Yahoo's headline fields came back null for
+   AAPL, so the sentiment agent correctly reported "unscoreable" rather than
+   inventing a tone. A real source (news API or RSS + extraction) is needed.
+5. **Flows and macro data.** Institutional holdings exist via yfinance but
+   changes over time do not. No rates, FX, or index series are wired in, so the
+   macro agent can only reason from single-name proxies.
+6. **Technical depth.** Trend, RSI, ATR, volatility and drawdown exist. No
+   support/resistance detection, no volume profile, no relative strength.
+7. **Unscored metrics.** `gross_margin_pct`, `atr14_pct`, `volume_vs_20d_avg`,
+   `short_ratio`, `audit_risk`, `overall_risk` and `compensation_risk` are computed
+   and cited by agents but have no rubric signal. They are registered as exempt
+   with reasons in `tests/test_rubric.py`, so adding one requires a deliberate edit.
+8. **No UI.** CLI and JSON artefacts only. No Analyze screen, Compare, Journal,
+   Watchlist, or portfolio tracking.
+9. **No persistence layer.** Runs are files. No queryable history, no "what
+   changed since the last run".
+
+## Known failure modes, already handled
+
+Eight bugs shipped and were fixed during construction. The first four are pure
+Python errors; the last four are LLM-protocol errors. `tests/` guards all of them.
+
+1. **Wrong statement row.** Substring matching let `Other Non Operating Income
+   Expenses` satisfy the needle `"Operating Income"`, so Reliance's operating margin
+   was reported as **0.34% instead of 11.48%**, and the Bear built a confident thesis
+   on it. Fixed in `_pick_label`: whole-word token matching, exact match
+   short-circuits, fewest-extra-tokens wins. Guarded by `tests/test_metrics.py`.
+2. **Sign inversion.** An `higher_is_bullish` flag applied to already-ordered
+   threshold tables flipped every signal, scoring a low-debt test company as highly
+   leveraged. Direction now lives in the table only. Guarded by
+   `test_low_leverage_scores_positive_and_high_scores_negative`.
+3. **Unscored metric.** `operating_margin_pct` was computed and cited by agents but
+   absent from the signal table, so the 0.34% → 11.48% correction changed the
+   narrative and left the verdict untouched. Now a signal, and
+   `test_every_computed_metric_is_scored_or_explicitly_exempt` fails unless every
+   computed metric is mapped to a signal or exempted with a written reason.
+4. **Verifier phantom.** `"Beta of 1.08 means"` parsed as `1.08 million`, because the
+   optional unit group ate the `m` of "means". Fixed with a trailing negative
+   lookahead. Guarded by `test_verification_ignores_unit_letter_inside_a_word`.
+5. **Verifier blind spot.** Sourced `extras` values (institutional holder amounts)
+   were flagged as ungrounded. `_flatten` now walks nested extras. Guarded by
+   `test_verification_credits_sourced_extras`.
+6. **Token starvation.** Long JSON payloads pushed the Bear past its output ceiling
+   on both models, so it returned truncated JSON and reported `unavailable`. Fixed
+   by slimming the debate payload and treating `finish_reason == "length"` as a hard
+   failure that widens the ceiling and retries. A truncated response is never
+   promoted to an answer.
+7. **Output proportional to input.** Even after (6), the Bear still truncated: the
+   Bull emitted 12 verbose arguments, so the Bear generated unbounded rebuttals
+   (11,213 tokens against an 8,424 ceiling). Widening the cap repeatedly does not
+   converge, because the output scales with the input. Fixed by hard word and item
+   limits in the bull/bear prompts plus trimming the bull's arguments to 6 in the
+   payload that the Bear receives. The Bear dropped from `unavailable` to 6 attacks
+   at 7,076 tokens.
+8. **SEC 403.** EDGAR rejects a User-Agent whose contact is `dimitar@localhost` and
+   accepts `dimitar@example.com`. Every SEC call failed silently until fixed.
+
+**Fabrication is treated as worse than absence.** A failed agent returns
+`status="unavailable"` with an error string, never plausible-looking prose. This was
+verified twice: once by a run where 5 of 9 agents failed, and once by a TCS run where
+the `valuation` agent truncated on both models and the pipeline reported `agents 8/9`
+rather than passing off a half-written verdict agent as analysis.
+
+## Prompt bounding is part of the protocol
+
+Failure mode 7 generalises: on a chat-completions API you control only `max_tokens`,
+and these models do not stop at a requested JSON size. Every agent prompt therefore
+carries explicit hard limits (max items, max words per field), and the bull's arguments
+are trimmed to 6 before the bear sees them. Without both, the agent that fails is
+always the adversarial one, which is the worst possible component to lose silently.
+
+
+
+## Data sources
+
+- **yfinance** 1.7.0 — prices, OHLCV, statements, quote metadata. US and NSE
+  (`.NS`). No key. Yahoo's `quoteSummary` endpoint is crumb-gated (401) for raw
+  HTTP; the library handles it.
+- **SEC EDGAR XBRL** — `data.sec.gov/api/xbrl/companyfacts`. Free, requires a
+  descriptive User-Agent. 10,426 US tickers via `companyfiles/company_tickers.json`.
+- **NSE India direct** returns 403 to this host; India coverage comes through
+  yfinance `.NS` symbols, which work.
+
+## Scope
+
+Research tooling, personal use. Two independent horizon verdicts are structured
+interpretations of evidence, not instructions to trade. DCF-style multiples are
+estimates. No personalized financial advice.
