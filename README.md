@@ -214,18 +214,27 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    issue or split for the newer periods but not for the older ones, so a single series
    mixes both bases: HDFCBANK.NS carries 7.107bn shares for FY2024 (pre-bonus) next to
    15.319bn for FY2025 (post-bonus), and the metric read that as **+175.75%**, scoring the
-   `dilution` signal at -2 on the 1:1 bonus of 2025-08-26. The metric now refuses a change
-   that doubles or halves the count across the window, so the value goes missing: governance
-   coverage drops from 0.5 to 0.375 and the signal leaves the pillar instead of scoring a
-   corporate action. Real issuance and buybacks stay inside the band — in a 115-ticker
-   sample the widest are Realty Income at +48.5% (repeated equity raises) and AIG at -27.6%
-   (sustained buybacks) — and the guard changes no other ticker in that sample. Guarded by
-   `tests/test_metrics.py`, including the band boundaries and a rubric check that the
-   refused value is unavailable rather than scored. Two honest limits: the guard refuses
-   the artefact rather than computing the true value, which for HDFCBANK.NS is +0.57% for
-   the latest year; and a moderate artefact stays invisible to it, because the HDFC Bank
-   ADS listing HDB reports 37.67% where the latest year is 7.77%. Separating issuance from
-   a restated series needs the split history, which is not wired in yet.
+   `dilution` signal at -2 on the 1:1 bonus of 2025-08-26. The metric is now refused when
+   two things hold together: the change doubles or halves the count across the window, and
+   a material split or bonus (1.5:1 or larger, or its reverse) is dated inside the statement
+   window, read from the full split history rather than the two-year price window. The
+   refusal is ordinary missing data, so governance coverage drops from 0.5 to 0.375 and the
+   signal leaves the pillar instead of scoring a corporate action.
+   **The split is required evidence, not a magnitude test.** A count that doubles with no
+   split behind it is issuance — an all-stock acquisition or sustained equity financing —
+   and keeps its -2, because refusing it would delete a real dilution penalty and flatter
+   the company. In a 115-ticker sample 8 tickers have a material split inside their
+   statement window and 1 of them leaves the band, so the two conditions refuse exactly
+   one ticker, and the other 7 keep their numbers. Real issuance and buybacks inside the
+   band are unchanged: the widest are Realty Income at +48.5% (repeated equity raises) and
+   AIG at -27.6% (sustained buybacks). Guarded by `tests/test_metrics.py`, including both
+   band boundaries with split evidence, a doubling with no split, a split older than the
+   window, a spin-off-sized adjustment of 1.061, and a rubric check that a refused value
+   is unavailable rather than scored. Three honest limits: the guard refuses the artefact
+   rather than computing the true value, which for HDFCBANK.NS is +0.57% for the latest
+   year; a moderate artefact stays invisible to it, because the HDFC Bank ADS listing HDB
+   reports 37.67% where the latest year is 7.77%; and a bonus that yfinance records as a
+   stock dividend rather than a split carries no evidence, so it keeps its number.
 
 **Fabrication is treated as worse than absence.** A failed agent returns
 `status="unavailable"` with an error string, never plausible-looking prose: a truncated
@@ -246,7 +255,7 @@ always the adversarial one, which is the worst possible component to lose silent
 
 ## Data sources
 
-- **yfinance** 1.7.0 — prices, OHLCV, statements, quote metadata. US and NSE
+- **yfinance** 1.7.0 — prices, OHLCV, statements, split histories, quote metadata. US and NSE
   (`.NS`). No key. Yahoo's `quoteSummary` endpoint is crumb-gated (401) for raw
   HTTP; the library handles it.
 - **SEC EDGAR XBRL** — `data.sec.gov/api/xbrl/companyfacts`. Free, requires a descriptive

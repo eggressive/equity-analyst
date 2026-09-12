@@ -299,27 +299,64 @@ def risk(b) -> dict:
     }
 
 
-# Share counts are compared first column against last over 3 to 5 annual columns. A
-# count that doubles or halves across that window is a corporate action, not issuance:
-# yfinance restates the newer annual columns of a bonus issue or split but not the older
-# ones, so one series mixes both bases (HDFCBANK.NS: 7.107bn pre-bonus next to 15.319bn
-# post-bonus, reported as +175.75%). Real issuance and real buybacks stay inside the band:
-# the widest in a 115-ticker sample are O at +48.5% (repeated equity raises) and AIG at
-# -27.6% (sustained buybacks).
-MAX_PLAUSIBLE_SHARE_RATIO = 2.0
-MIN_PLAUSIBLE_SHARE_RATIO = 0.5
+# Share counts are compared first column against last across every annual column yfinance
+# returns, 3 to 5 years. Two things must both hold before a change is refused as a
+# corporate-action artefact: the change leaves the plausible band for issuance, and a
+# material split or bonus is dated inside the statement window. The split is the evidence,
+# because yfinance restates the newer annual columns of a bonus but not the older ones, so
+# one series mixes both bases (HDFCBANK.NS: 7.107bn pre-bonus next to 15.319bn post-bonus
+# after the 1:1 bonus of 2025-08-26, reported as +175.75%). Requiring the split keeps
+# genuine issuance scored: a count that doubles with no split in the window is dilution and
+# still scores -2. Real issuance and buybacks inside the band are unchanged either way: the
+# widest in a 115-ticker sample are O at +48.5% (repeated equity raises) and AIG at -27.6%
+# (sustained buybacks).
+MAX_PLAUSIBLE_SHARE_RATIO = 2.0    # doubled across the window
+MIN_PLAUSIBLE_SHARE_RATIO = 0.5    # halved across the window
+MATERIAL_SPLIT_RATIO = 1.5         # a 3:2 split or larger, or its reverse; spin-off
+                                   # adjustments of a few percent cannot rebase a series
+
+
+def _naive_ts(ts):
+    """Statement columns are tz-naive, yfinance split dates are exchange-local."""
+    ts = pd.Timestamp(ts)
+    return ts.tz_localize(None) if ts.tzinfo is not None else ts
+
+
+def _split_inside_window(splits, columns) -> bool:
+    """True when a material split or bonus is dated inside the statement window.
+
+    That is the only case where the annual share count can mix two bases, so it is the
+    evidence required before an implausible change is refused. A missing or empty split
+    series returns False, which keeps the change and its issuance score.
+    """
+    if splits is None or len(splits) == 0 or columns is None or len(columns) < 2:
+        return False
+    dates = [_naive_ts(c) for c in columns]
+    oldest, newest = min(dates), max(dates)
+    for date, ratio in splits.items():
+        try:
+            ratio = float(ratio)
+        except (TypeError, ValueError):
+            continue
+        if ratio <= 0:
+            continue
+        material = ratio >= MATERIAL_SPLIT_RATIO or ratio <= 1 / MATERIAL_SPLIT_RATIO
+        if material and oldest < _naive_ts(date) <= newest:
+            return True
+    return False
 
 
 def governance(b) -> dict:
     """Ownership metrics plus the corporate-action check on the share count.
 
     `share_dilution_pct` is the change in average shares across the annual columns
-    yfinance returns: newest column against oldest. A change that doubles the count or
-    halves it is refused instead of reported, because that is how a bonus issue or a
-    split looks when yfinance restates the newer columns but not the older ones: the
-    series then mixes bases and the difference is not issuance. The refusal is ordinary
-    missing data, so governance coverage drops and the dilution signal leaves the pillar
-    rather than scoring a corporate action as dilution.
+    yfinance returns: newest column against oldest. It is refused only when both hold: the
+    change doubles or halves the count, and a material split or bonus sits inside the
+    statement window. That is how a corporate action looks when yfinance restates the newer
+    columns but not the older ones: the series mixes bases and the difference is not
+    issuance. A large change with no split in the window is issuance and keeps its score.
+    The refusal is ordinary missing data, so governance coverage drops and the dilution
+    signal leaves the pillar rather than scoring a corporate action as dilution.
     """
     q = b.quote
     inc = b.income
@@ -329,11 +366,13 @@ def governance(b) -> dict:
         s = shares_now.dropna()
         oldest, newest = float(s.iloc[-1]), float(s.iloc[0])
         ratio = newest / oldest if oldest else None
+        outside_band = ratio is not None and (
+            ratio >= MAX_PLAUSIBLE_SHARE_RATIO or ratio <= MIN_PLAUSIBLE_SHARE_RATIO
+        )
         dilution = (
-            _pct(newest - oldest, oldest)
-            if ratio is not None
-            and MIN_PLAUSIBLE_SHARE_RATIO < ratio < MAX_PLAUSIBLE_SHARE_RATIO
-            else None
+            None
+            if outside_band and _split_inside_window(getattr(b, "splits", None), s.index)
+            else _pct(newest - oldest, oldest)
         )
 
     return {

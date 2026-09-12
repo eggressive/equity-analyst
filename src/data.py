@@ -62,6 +62,10 @@ class TickerBundle:
     balance: pd.DataFrame = field(default_factory=pd.DataFrame)
     cashflow: pd.DataFrame = field(default_factory=pd.DataFrame)
     quarterly_income: pd.DataFrame = field(default_factory=pd.DataFrame)
+    # Full split and bonus history, not limited by history_period: the statement window
+    # reaches further back than the two-year price window, and a bonus inside the
+    # statement window is what makes an annual share-count series mix bases.
+    splits: pd.Series = field(default_factory=lambda: pd.Series(dtype=float))
     quote: dict = field(default_factory=dict)
     evidence: list[Evidence] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -113,6 +117,12 @@ def load(symbol: str, history_period: str = "2y") -> TickerBundle:
             setattr(b, target, df if df is not None else pd.DataFrame())
         except Exception as e:
             b.warnings.append(f"{attr} failed: {type(e).__name__}")
+
+    try:
+        s = t.splits
+        b.splits = s if s is not None else pd.Series(dtype=float)
+    except Exception as e:  # actions endpoint failure only weakens one guard
+        b.warnings.append(f"splits failed: {type(e).__name__}")
 
     try:
         b.quote = t.info or {}
