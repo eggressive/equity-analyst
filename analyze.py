@@ -183,8 +183,14 @@ def run(symbol: str, model: str | None = None, no_llm: bool = False, quiet: bool
         for v in (r.data.get("score"), r.data.get("confidence"))
         if isinstance(v, (int, float))
     ]
+    # Coverage fractions and the price context are cited by agents and allowed by
+    # the citation check, so the verifier has to accept them as evidence too.
+    extras = dict(bundle.get("extras") or {})
+    extras["pillar_coverage"] = bundle.get("pillar_coverage") or {}
+    extras["context"] = bundle.get("context") or {}
+    extras["news_count"] = len(extras.get("news") or [])
     v = verify_mod.verify_claims(
-        all_text, bundle["pillars"], declared_scores=scores, extras=bundle.get("extras"),
+        all_text, bundle["pillars"], declared_scores=scores, extras=extras,
     )
     v["agent_violations"] = {
         n: r.violations for n, r in specialists.items() if r.violations

@@ -240,6 +240,85 @@ def test_verification_credits_sourced_extras():
     assert v["unverified"] == 0, v
 
 
+def test_b_and_t_suffixed_money_keeps_its_magnitude():
+    """'$416.2B' used to parse as 416: no unit for B or T, and the lookahead then cut
+    the match at the decimal point. Agents write magnitudes this way constantly."""
+    assert verify.extract_numbers("Revenue of $416.2B") == [(416.2e9, "b")]
+    pillars = {"fundamentals": {"revenue": 416.2e9}, "valuation": {"market_cap": 4.85e12}}
+    v = verify.verify_claims("Revenue of $416.2B on a $4.85T market cap.", pillars)
+    assert v["claims_found"] == 2 and v["unverified"] == 0, v
+
+
+def test_iso_date_digits_are_not_claims():
+    """A date is not evidence. Its month and day used to be counted, and a fragment
+    like 10 then collided with an unrelated metric value."""
+    v = verify.verify_claims(
+        "Next earnings on 2026-10-29, seven weeks after 2026-09-13.", PILLARS
+    )
+    assert v["claims_found"] == 0, v
+
+
+def test_window_digits_are_not_claims():
+    """'the 50- and 200-day averages' names two windows. Only the second used to be
+    masked, so the 50 became a claim."""
+    v = verify.verify_claims("Price is below the 50- and 200-day averages.", PILLARS)
+    assert v["claims_found"] == 0, v
+
+
+def test_a_signed_metric_accepts_the_magnitude_an_agent_states():
+    """'Shares fell 1.5%' describes a metric recorded as -1.5. Sign is not the claim."""
+    v = verify.verify_claims("Shares fell 1.5% and the drawdown reached 22.0%.", PILLARS)
+    assert v["unverified"] == 0, v
+
+
+def test_unrelated_metrics_do_not_derive_a_value():
+    """pe_ttm / revenue_growth is cross-pillar with no price or level metric in the
+    pair, so 5.0 is not in the acceptable set. The same pair inside one pillar is,
+    which is the difference between arithmetic and coincidence."""
+    cross = {"valuation": {"pe_ttm": 40.0}, "fundamentals": {"revenue_growth_yoy_pct": 8.0}}
+    v = verify.verify_claims("The multiple sits at 5.0 on revenue growth.", cross)
+    assert v["unverified"] == 1, v
+    same = {"valuation": {"pe_ttm": 40.0, "ev_to_ebitda": 8.0}}
+    v2 = verify.verify_claims("The multiple sits at 5.0 on EBITDA.", same)
+    assert v2["unverified"] == 0, v2
+
+
+def test_a_ratio_is_read_as_a_share_or_a_percentage():
+    """'85.5% of net income' is the ratio 0.855 written the other way round, and the
+    pair can be stored in either order."""
+    pillars = {"fundamentals": {"net_income": 80.0, "fcf": 68.4}}
+    v = verify.verify_claims("Free cash flow is 85.5% of net income.", pillars)
+    assert v["unverified"] == 0, v
+    v2 = verify.verify_claims("Free cash flow is 0.86 of net income.", pillars)
+    assert v2["unverified"] == 0, v2
+
+
+def test_coverage_and_context_are_evidence_when_passed():
+    """The citation check allows pillar_coverage and context keys, so the verifier has
+    to accept them once analyze.py passes them through."""
+    extras = {"pillar_coverage": {"governance": 0.375}, "news_count": 10}
+    v = verify.verify_claims(
+        "Governance coverage is 37.5% and 10 news items returned no headline.",
+        PILLARS, extras=extras,
+    )
+    assert v["unverified"] == 0, v
+
+
+def test_a_fully_invented_paragraph_is_reviewed():
+    """The headline failure, guarded. Every number here is invented and none is
+    evidence or honest arithmetic on evidence, so the run must not come out clean."""
+    text = (
+        "Revenue grew 14.7% while gross margin held at 42.4%, leaving free cash flow of "
+        "185.0bn against a market cap of 2.44trn. Shares trade at 30.86x book and 28.5x "
+        "forward earnings, with a dividend yield of 4.1%. Institutions hold 71.4% and "
+        "insiders 12.7%. The share count fell 7.3% over the year, beta reads 2.31, and the "
+        "deepest drawdown was -48.2%."
+    )
+    v = verify.verify_claims(text, PILLARS)
+    assert v["verdict"] == "REVIEW", v
+    assert v["grounding_rate"] < 0.8, v
+
+
 def test_citation_checker_rejects_invented_keys_under_allowed_prefixes():
     """Regression guard for the prefix bypass. Any key starting with context./extras./
     data_quality./pillar_coverage. used to be accepted, including the peer and consensus
