@@ -175,6 +175,46 @@ def test_absent_operating_income_falls_through_to_ebit():
     assert metrics._pick_label(df, "Operating Income", "EBIT") == "EBIT"
     assert metrics.fundamentals(FakeBundle(df))["operating_margin_pct"] == 21.32
 
+# Captured from live yfinance on 2026-09-13, not modelled. The selection is every row in
+# the live index whose whole-word tokens could satisfy either needle: a candidate for
+# ("Operating Income", "EBIT") must carry an "operating" token or the "ebit" token, so
+# rows holding only "income" cannot qualify. Total Revenue is included so the metric can
+# be computed. BRK-B has 40 statement rows, HDFCBANK.NS 41.
+BRK_LIVE_ROWS = pd.DataFrame(
+    {"2026": [410522000000.0, 87528000000.0, -5069000000.0, 5069000000.0,
+              36480000000.0, 410522000000.0],
+     "2025": [424232000000.0, 115576000000.0, -5200000000.0, 5200000000.0,
+              37292000000.0, 424232000000.0]},
+    index=["Total Revenue", "EBIT", "Net Non Operating Interest Income Expense",
+           "Interest Expense Non Operating", "Other Operating Expenses", "Operating Revenue"],
+)
+HDFC_LIVE_ROWS = pd.DataFrame(
+    {"2026": [1925667800000.0, 1925667800000.0, -36789600000.0],
+     "2025": [1838641100000.0, 1838641100000.0, -62950500000.0]},
+    index=["Total Revenue", "Operating Revenue", "Other Non Operating Income Expenses"],
+)
+
+
+def test_live_brk_row_set_yields_ebit_and_only_ebit():
+    """The live row set rather than a model of it. Only EBIT qualifies; the interest and
+    expense rows are refused by the meaning changers, so the -1.23% pick cannot return."""
+    assert metrics._pick_label(BRK_LIVE_ROWS, "Operating Income", "EBIT") == "EBIT"
+    assert metrics._pick_label(BRK_LIVE_ROWS, "Operating Income") is None
+    f = metrics.fundamentals(FakeBundle(BRK_LIVE_ROWS))
+    assert f["revenue"] == 410522000000.0
+    assert f["operating_margin_pct"] == 21.32
+    assert rubric.build_signals({"fundamentals": f})["fundamentals"]["operating_margin"] == 2
+
+
+def test_live_hdfc_row_set_leaves_operating_margin_none():
+    """HDFCBANK.NS's live rows hold no operating-income line, so the metric stays None and
+    the pillar dilutes instead of scoring the -1.91% the other non-operating row implies."""
+    assert metrics._pick_label(HDFC_LIVE_ROWS, "Operating Income", "EBIT") is None
+    f = metrics.fundamentals(FakeBundle(HDFC_LIVE_ROWS))
+    assert f["revenue"] == 1925667800000.0
+    assert f["operating_margin_pct"] is None
+    assert rubric.build_signals({"fundamentals": f})["fundamentals"]["operating_margin"] is None
+
 
 ASML_CASHFLOW = pd.DataFrame(
     {"2026": [12658500000.0, -1631200000.0, 11027300000.0]},
