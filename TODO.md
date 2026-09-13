@@ -5,7 +5,7 @@ Completed changes belong in [CHANGELOG.md](CHANGELOG.md).
 
 ## Validation baseline
 
-- **Tests:** `tests/test_metrics.py` passed 36/36; `tests/test_rubric.py` passed 43/43.
+- **Tests:** `tests/test_metrics.py` passed 36/36; `tests/test_rubric.py` passed 44/44.
 - **Live check:** AAPL completed with `--no-llm`. Paid LLM calls were not tested.
 - **Evidence:** Edge cases below were reproduced with synthetic inputs where stated; corpus impact is unknown.
 - **Implementation rules:** Follow [AGENTS.md](AGENTS.md), including its owner decisions, defect-registration rule and artifact refresh requirements. Add regression tests for each fix.

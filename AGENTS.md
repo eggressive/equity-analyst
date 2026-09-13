@@ -145,8 +145,10 @@ All four items from the 2026-09-12 review are decided and implemented.
 
 ## Known live defects (do not fix unilaterally)
 
-Nothing is tracked here right now. Add an entry before changing the behaviour it
-describes, and name the decision it needs.
+The register is [`TODO.md`](TODO.md): the open findings from the 2026-09-13 validation,
+with the reproduction evidence and the decision each one needs. Read it before changing
+behaviour it describes, and add an entry rather than leaving a defect untracked. Decided
+items move into a decisions section here, like the share-count metric above.
 
 ## Data-source pitfalls (verified on this machine)
 
