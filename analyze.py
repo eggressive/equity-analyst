@@ -97,6 +97,20 @@ def build_bundle(symbol: str, with_extras: bool = True) -> dict:
     }
 
 
+def _verify_extras(bundle: dict) -> dict:
+    """Evidence the verifier needs beyond the metric pillars.
+
+    build_bundle has already counted the headlines and dropped the list, so the
+    count comes from the bundle. Recomputing it from a missing list wrote zero and
+    left a sentiment agent citing the real count ungrounded.
+    """
+    extras = dict(bundle.get("extras") or {})
+    extras["pillar_coverage"] = bundle.get("pillar_coverage") or {}
+    extras["context"] = bundle.get("context") or {}
+    extras.setdefault("news_count", len(extras.get("news") or []))
+    return extras
+
+
 def deterministic_report(bundle: dict) -> dict:
     signals = rubric_mod.build_signals(bundle["pillars"])
     horizons = {h: rubric_mod.score(signals, h) for h in ("SHORT_TERM", "LONG_TERM")}
@@ -208,10 +222,7 @@ def run(symbol: str, model: str | None = None, no_llm: bool = False, quiet: bool
     ]
     # Coverage fractions and the price context are cited by agents and allowed by
     # the citation check, so the verifier has to accept them as evidence too.
-    extras = dict(bundle.get("extras") or {})
-    extras["pillar_coverage"] = bundle.get("pillar_coverage") or {}
-    extras["context"] = bundle.get("context") or {}
-    extras["news_count"] = len(extras.get("news") or [])
+    extras = _verify_extras(bundle)
     v = verify_mod.verify_claims(
         all_text, bundle["pillars"], declared_scores=scores, extras=extras,
     )

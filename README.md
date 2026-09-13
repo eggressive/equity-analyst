@@ -88,8 +88,8 @@ Two horizons with different weights:
 | Symbol | SHORT_TERM | LONG_TERM | Agents | Grounding | Unmatched | Time |
 |---|---|---|---|---|---|---|
 | AAPL | NEUTRAL +0.294 | BULLISH +0.458 | 9/9 | 1.000 | 0 | 87s |
-| RELIANCE.NS | BULLISH +0.500 | BULLISH +0.734 | 9/9 | 1.000 | 0 | 112s |
-| TCS.NS | NEUTRAL +0.246 | BULLISH +0.796 | 9/9 | 1.000 | 0 | 66s |
+| RELIANCE.NS | BULLISH +0.500 | BULLISH +0.734 | 9/9 | 0.995 | 1 | 124s |
+| TCS.NS | NEUTRAL +0.246 | BULLISH +0.796 | 9/9 | 0.986 | 2 | 108s |
 
 Artefacts: `runs/AAPL_final.json`, `runs/RELIANCE_full.json`, `runs/TCS_full.json`.
 Verdicts, scores, grounding rates, agent counts and run times are read back from those
@@ -120,20 +120,22 @@ The debate cannot move the verdict. The rubric is computed from the metric bundl
 any agent runs, so the debate changes the narrative only. That is a property of the code,
 not of these runs: no artefact stores a before/after verdict pair.
 
-**Unmatched numbers are zero across all three tickers**: every figure any agent wrote
-resolved either to an evidence value or to arithmetic over evidence values. Read that
-carefully, because the guarantee is weaker than it sounds. Matching is value-level, not
-claim-level: a number counts when it equals an evidence value, or a derived value whose two
-metrics are named beside it. The index holds 3,648 derived values for the 71 values one run
-exposes, and random numbers between 0.05 and 100 still land in it 98% of the time because
-percentages are dense, so `unverified = 0` means "nothing obviously invented", not "every
-claim is grounded". Attribution is what protects a paragraph rather than a number: two
-thousand fully invented 12-number paragraphs, run against a live AAPL bundle on 2026-09-13,
-passed on 100% of draws before this change and on 1.2% of draws after it. Of the
-AAPL/RELIANCE/TCS `claims_found` of 168/183/178, the derived index carried 0, 8 and 4
-numbers, and nothing sat in neither column. REVIEW stays informational: it appends a warning
-and names the agent in `verification.unverified_by_agent`, and it never reaches the score.
-No run records a citation violation.
+**Almost nothing is unmatched**: 0 numbers on AAPL, 1 on RELIANCE.NS and 2 on TCS.NS, and
+all three still PASS. None of the three leftovers is a computed figure: they are the index
+name "Nifty 50", and two 5% revenue-growth bounds in a what-would-break-this list. Read
+that carefully, because the guarantee is weaker than it sounds. Matching is value-level,
+not claim-level: a number counts when it equals an evidence value, or a derived value whose
+two metrics are named beside it. The index holds 3,648 derived values for the 71 values one
+run exposes, and a random number between 0.05 and 100 is accepted 27% of the time, 2.7%
+when it looks like money, so `unverified = 0` means "nothing obviously invented", not
+"every claim is grounded". Attribution is what protects a paragraph rather than a number:
+two thousand fully invented 12-number paragraphs, run against a live AAPL bundle on
+2026-09-13, passed on 100% of draws before this change and on none of them now, leaving 8.6
+ungrounded numbers per paragraph. All 168/188/141 claims of the tracked runs resolved to
+evidence values, so the derived index carried none of them, which is what naming both
+operands costs and buys. REVIEW stays informational: it appends a warning and names the
+agent in `verification.unverified_by_agent`, and it never reaches the score. No run records
+a citation violation.
 
 
 
@@ -269,7 +271,8 @@ recorded here only, which is a real gap in the suite rather than a claim of cove
    and 48.0, which their prose described as data errors. Both went stale when the code changed.
    On 2026-09-13 all three tickers were re-run on the merged code with the same model, and the
    tracked artefacts are those runs: same rows, the deterministic block identical to the
-   2026-09-12 runs, grounding 1.000 across all three and no unverified numbers.
+   2026-09-12 runs, grounding 1.000, 0.995 and 0.986, and three ungrounded numbers
+   across the three.
    Guarded by `tests/test_metrics.py`: the bonus repair, the quarterly fallback, the refusal
    when neither series is usable, the trend reading against the endpoint reading, one factor
    repairing one step, a reverse split with issuance, and a rubric check that a refused value
@@ -288,14 +291,25 @@ recorded here only, which is a real gap in the suite rather than a claim of cove
     news-count values the citation check already allowed.
 
     **Fixed 2026-09-13.** Derived values now come only from related metrics, same pillar or
-    a price and level metric, and only when one of the pair is named beside the number, so
-    the index holds **3,648** values. Extraction reads B, T, trn, tn and k, and masks dates
-    and window runs. A signed metric accepts the magnitude stated, and a ratio is read as a
-    share or a percentage in either pair order. Coverage, context and news count reach the
-    verifier. A text of 20 claims or fewer also fails on an absolute floor, PASS needing at
-    most one ungrounded number, and a REVIEW verdict appends a warning and names the agent
-    that wrote the ungrounded numbers. The same 2,000 invented paragraphs pass on **1.2%**
-    of draws, and the three tracked runs stay PASS with `unverified 0`.
+    a price and level metric, and only when **both** of the pair are named beside the
+    number, so the index holds **3,648** values. Extraction reads B, T, trn, tn and k, and
+    masks dates and window runs. A signed metric accepts the magnitude stated, and a ratio
+    is read as a share or a percentage in either pair order. Coverage, context and news
+    count reach the verifier. A text of 20 claims or fewer also fails on an absolute floor,
+    PASS needing at most one ungrounded number, and a REVIEW verdict appends a warning and
+    names the agent that wrote the ungrounded numbers. The same 2,000 invented paragraphs
+    pass on **none** of the draws, with 8.6 ungrounded numbers left per paragraph, and the
+    three tracked runs stay PASS.
+
+    **Three more holes were found reviewing the fix itself**, all of them ways to keep
+    believing an invented number: naming one operand was enough for a derived match (so
+    "revenue doubled by 2x" passed on revenue and free cash flow); the hundredfold bridge
+    applied to money and multiples, so a PE of 40 verified "0.4x" and 416.2B of revenue
+    verified a claim of 4.162B; and the verify stage recomputed `news_count` from a
+    headline list that `build_bundle` had already dropped, writing zero, so a sentiment
+    agent citing the real count of 10 was grounded only when 10 collided with something
+    else. Naming both operands cuts random single-number acceptance from 100% to **27%**
+    (money 57% to **2.7%**).
 
     Guarded by `tests/test_rubric.py`: a fully invented paragraph is REVIEW, `$416.2B` keeps
     its magnitude, a date and a window run contribute no claims, a signed metric accepts its

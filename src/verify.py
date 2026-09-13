@@ -13,12 +13,13 @@ that a number was attached to the metric the agent claimed it for, so "net margi
 18.0%" still passes when 18.0 is a P/E elsewhere in the bundle.
 
 Measured on an AAPL bundle of 66 metric values plus coverage, context and news count,
-2026-09-13: the derived index holds 3,648 values, and random numbers in 0.05..100 land
-in it 98% of the time, because percentages are dense. What attribution buys is the
-paragraph. A fully invented 12-number paragraph returned PASS on 100% of draws under
-value-level matching and returns PASS on 1.2% of draws now. Read `unverified == 0` as
-"nothing obviously invented", not as proof of grounding. Judge output is never passed
-through this module.
+2026-09-13: the derived index holds 3,648 values, and a random number in 0.05..100 is
+accepted 27% of the time (36% when it looks like a percentage, 2.7% when it looks like
+money), because percentages are dense. Before the attribution rule the same harness
+accepted 100%. What attribution buys is the paragraph: a fully invented 12-number
+paragraph returned PASS on 100% of draws, and on none of 2,000 draws now, with 8.6
+ungrounded numbers left per paragraph. Read `unverified == 0` as "nothing obviously
+invented", not as proof of grounding. Judge output is never passed through this module.
 """
 
 from __future__ import annotations
@@ -41,7 +42,15 @@ NUMBER_RE = re.compile(
 # address the original text for attribution.
 LABEL_PHRASES = re.compile(
     r"\b\d{1,3}(?:\s*[-/,]\s*(?:and\s+)?\d{1,3})*\s*[- ]\s*(?:day|week|month|year|quarter|yr)s?\b"
-    r"|\b\d{4}-\d{2}-\d{2}\b",
+    r"|\b\d{4}-\d{2}-\d{2}\b"
+    # A written date is a date too: "October 16" is a day of the month, not a claim.
+    # The lookahead keeps "margin 25.58%" and "market 3" out of the mask.
+    r"|\b(?:january|february|march|april|may|june|july|august|september|october|november"
+    r"|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\.?(?![a-z])\s+"
+    r"\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?\b"
+    r"|\b\d{1,2}(?:st|nd|rd|th)?\s+(?:january|february|march|april|may|june|july|august"
+    r"|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov"
+    r"|dec)\.?(?![a-z])(?:\s+\d{4})?\b",
     re.I,
 )
 
@@ -51,6 +60,12 @@ LABEL_PHRASES = re.compile(
 PASS_UNVERIFIED_RATIO = 0.20
 SHORT_TEXT_CLAIMS = 20
 SHORT_TEXT_FLOOR = 2
+
+# Percentage-stored metrics: `_pct` suffixed keys plus the three that carry a prefix
+# instead. A fraction written as a percentage (0.375 and "37.5%") is one quantity;
+# reading a percentage as its fraction is only allowed for these, because revenue
+# 416.2B is not 4.162B and a PE of 40 is not 0.4x.
+_PCT_KEY_RE = re.compile(r"(_pct$|^pct_|trend_vs_|percentage)", re.I)
 
 UNITS = {
     "%": 1.0, "x": 1.0, "": 1.0,
@@ -113,6 +128,23 @@ def _mask_labels(text: str) -> str:
     return LABEL_PHRASES.sub(lambda m: " " * len(m.group(0)), text or "")
 
 
+def _percent_named(key: str) -> bool:
+    """Is this metric's value stored as a percentage rather than a fraction?"""
+    return bool(_PCT_KEY_RE.search(key.rsplit(".", 1)[-1] or ""))
+
+
+def _basis_named(named: set[str], ka: str, kb: str) -> bool:
+    """Both metrics behind a derived value must be named beside the number.
+
+    Naming one operand is not enough. With revenue and free cash flow in the bundle,
+    "the figure is 2x" named nothing and "revenue doubled by 2x" named one operand,
+    and both passed as an FCF/revenue derivation. A number with no metric named near
+    it is still accepted when it equals an evidence value: only the derived index
+    needs its basis spelled out.
+    """
+    return ka in named and kb in named
+
+
 # A derived value is credible only when the metrics behind it are related: same
 # pillar, or one of them a price or level. Market cap minus revenue growth is
 # arithmetic nobody does; free cash flow over market cap is a yield someone quotes.
@@ -162,7 +194,7 @@ METRIC_ALIASES = {
     "fundamentals.revenue": ["revenue", "sales", "top line"],
     "fundamentals.revenue_growth_yoy_pct": ["revenue growth", "sales growth",
                                             "top-line growth"],
-    "fundamentals.net_income": ["net income", "net earnings"],
+    "fundamentals.net_income": ["net income", "net earnings", "ni"],
     "fundamentals.gross_margin_pct": ["gross margin"],
     "fundamentals.operating_margin_pct": ["operating margin"],
     "fundamentals.net_margin_pct": ["net margin", "profit margin"],
@@ -274,32 +306,35 @@ def verify_claims(text: str, pillars: dict, rel_tol: float = 0.02,
         return abs(value - target) <= abs(target) * rel_tol or \
             abs(value + target) <= abs(target) * rel_tol
 
-    def candidates(value: float, unit: str, target: float, scaled: bool = True) -> list[float]:
+    def candidates(value: float, unit: str, target: float,
+                   divide_ok: bool = False) -> list[float]:
         """The target, plus its percentage or fractional twin.
 
         "Governance coverage is 37.5%" and the bundle's 0.375 are the same quantity,
         and so are "85.7% of net income" and the ratio 0.857. Scale-bridging keeps
-        the index small; generating both forms would double it.
+        the index small; generating both forms would double it. The reverse bridge,
+        reading a percentage as its fraction, needs the metric to be a percentage.
         """
         out = [target]
-        if scaled:
-            if unit == "%" and 0 < abs(target) < 1:
-                out.append(target * 100)
-            elif unit in ("", "x") and abs(target) > 1:
-                out.append(target / 100)
+        if unit == "%" and 0 < abs(target) < 1:
+            out.append(target * 100)
+        elif unit in ("", "x") and abs(target) > 1 and divide_ok:
+            out.append(target / 100)
         return out
 
     def match(value: float, unit: str, start: int):
         named = named_metrics(body, start)
         for key, kv in known:
-            if any(close(value, c) for c in candidates(value, unit, kv)):
+            if any(close(value, c) for c in candidates(value, unit, kv,
+                                                       divide_ok=_percent_named(key))):
                 return ("evidence", key)
         if value == 0:
             return (None, None)
         for dv, expr, ka, kb, kind in derived:
-            if named and ka not in named and kb not in named:
+            if not _basis_named(named, ka, kb):
                 continue
-            if any(close(value, c) for c in candidates(value, unit, dv, scaled=kind == "ratio")):
+            if any(close(value, c) for c in candidates(value, unit, dv,
+                                                       divide_ok=kind == "pct")):
                 return ("derived", expr)
         return (None, None)
 

@@ -118,9 +118,12 @@ comments alike.
 - **Names, not just values.** A number matches an evidence value, or a derived value whose
   two metrics are named beside it. Extend `METRIC_ALIASES` when agents start citing a metric
   by a name the table does not cover, or honest prose gets flagged.
-- **`unverified == 0` is not proof of grounding.** Value-level matching still accepts 98% of
+- **`unverified == 0` is not proof of grounding.** Value-level matching still accepts 27% of
   random numbers in 0.05..100 on an AAPL bundle (measured 2026-09-13). The paragraph-level
   guard is `test_a_fully_invented_paragraph_is_reviewed`.
+- **The count, not the list.** `analyze._verify_extras` takes `news_count` from the bundle.
+  Recomputing it from the headline list writes zero, because the bundle no longer carries
+  the list.
 - **REVIEW is informational.** It appends a warning and `verification.unverified_by_agent`.
   It must never reach a score: the rubric is computed before any agent runs.
 

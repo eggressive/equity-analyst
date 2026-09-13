@@ -8,8 +8,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import agents  # noqa: E402
+import analyze  # noqa: E402
 import rubric  # noqa: E402
 import verify  # noqa: E402
 
@@ -276,11 +278,71 @@ def test_unrelated_metrics_do_not_derive_a_value():
     pair, so 5.0 is not in the acceptable set. The same pair inside one pillar is,
     which is the difference between arithmetic and coincidence."""
     cross = {"valuation": {"pe_ttm": 40.0}, "fundamentals": {"revenue_growth_yoy_pct": 8.0}}
-    v = verify.verify_claims("The multiple sits at 5.0 on revenue growth.", cross)
+    v = verify.verify_claims("The P/E of 5.0 against revenue growth.", cross)
     assert v["unverified"] == 1, v
     same = {"valuation": {"pe_ttm": 40.0, "ev_to_ebitda": 8.0}}
-    v2 = verify.verify_claims("The multiple sits at 5.0 on EBITDA.", same)
+    v2 = verify.verify_claims("The P/E of 5.0 against EV/EBITDA.", same)
     assert v2["unverified"] == 0, v2
+
+
+def test_derived_value_needs_both_operands_named():
+    """Revenue 100 and free cash flow 50 make 2x. Naming no operand, or one, is not
+    a derivation: only the sentence that names both is grounded."""
+    pillars = {"fundamentals": {"revenue": 100.0, "fcf": 50.0}}
+    assert verify.verify_claims("The figure is 2x.", pillars)["unverified"] == 1
+    assert verify.verify_claims("Revenue doubled by 2x.", pillars)["unverified"] == 1
+    assert verify.verify_claims("Revenue is 2x free cash flow.", pillars)["unverified"] == 0
+
+
+def test_money_and_multiples_do_not_read_as_a_hundredth():
+    """A percentage-stored metric accepts its fraction form, so 0.2692 is 26.92% of
+    margin. A PE of 40 is not 0.4x, and 416.2B of revenue is not 4.162B."""
+    pct = {"fundamentals": {"net_margin_pct": 26.92}}
+    assert verify.verify_claims("The margin sits at 0.2692.", pct)["unverified"] == 0
+    money = {"valuation": {"pe_ttm": 40.0}, "fundamentals": {"revenue": 416.2e9}}
+    assert verify.verify_claims("The PE sits at 0.4x.", money)["unverified"] == 1
+    assert verify.verify_claims("Revenue is 4162000000.", money)["unverified"] == 1
+
+
+def test_written_dates_are_not_claims():
+    """A day of the month is a date, not a figure: the tracked RELIANCE.NS bear read
+    "the October 16 earnings date" as the claim 16."""
+    v = verify.verify_claims("The October 16 earnings date is the near-term catalyst.", {})
+    assert v["claims_found"] == 0, v
+    v2 = verify.verify_claims("Earnings land on 16 October 2026.", {})
+    assert v2["claims_found"] == 0, v2
+    v3 = verify.verify_claims("Revenue grew 5% ahead of October 16.", {})
+    assert v3["claims_found"] == 1, v3
+    # "margin" and "market" open with the letters of March and May. A first cut of
+    # this mask ate two real claims per run: "gross margin 46.91%" lost its 46.91.
+    v4 = verify.verify_claims("Gross margin 46.91% and operating margin 11.48%.", {})
+    assert v4["claims_found"] == 2, v4
+    v5 = verify.verify_claims("The market cap of 416.2B dwarfs free cash flow.", {})
+    assert v5["claims_found"] == 1, v5
+    v6 = verify.verify_claims("The margin may reach 5% next year.", {})
+    assert v6["claims_found"] == 1, v6
+
+
+def test_a_slash_pair_names_both_operands():
+    """The RELIANCE.NS bear wrote "FCF/NI is only 0.86x". Both metrics are named, so
+    the derivation is grounded, and 0.86 is the ratio 0.855 within tolerance."""
+    pillars = {"fundamentals": {"fcf": 68.4, "net_income": 80.0}}
+    v = verify.verify_claims("FCF/NI is only 0.86x, so earnings are not cash-backed.", pillars)
+    assert v["unverified"] == 0, v
+    assert v["derived_from_evidence"] == 1, v
+
+
+def test_news_count_survives_the_verify_extras_merge():
+    """The bundle carries a headline count, not the list. Recomputing the count from
+    the missing list wrote zero and left a sentiment agent citing 10 ungrounded."""
+    bundle = {"extras": {"news_count": 10, "news_headlines": ["a headline"]},
+              "pillar_coverage": {"governance": 0.375}, "context": {"market_cap": 1.0}}
+    extras = analyze._verify_extras(bundle)
+    assert extras["news_count"] == 10, extras
+    v = verify.verify_claims("News flow is 10 items flagged.", {}, extras=extras)
+    assert v["unverified"] == 0, v
+    raw = analyze._verify_extras({"extras": {"news": [{}, {}, {}]}})
+    assert raw["news_count"] == 3, raw
 
 
 def test_a_ratio_is_read_as_a_share_or_a_percentage():
