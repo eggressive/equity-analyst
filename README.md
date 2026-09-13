@@ -83,31 +83,37 @@ Two horizons with different weights:
 - `SHORT_TERM` (2-8 weeks): technicals 0.35, risk 0.30, valuation 0.15, fundamentals 0.10, governance 0.10
 - `LONG_TERM` (3-5 years): fundamentals 0.32, valuation 0.26, governance 0.20, risk 0.15, technicals 0.07
 
-## Verified runs (2026-09-12, current code)
+## Verified runs (2026-09-13, current code)
 
 | Symbol | SHORT_TERM | LONG_TERM | Agents | Grounding | Unmatched | Time |
 |---|---|---|---|---|---|---|
-| AAPL | NEUTRAL +0.294 | BULLISH +0.458 | 9/9 | 0.968 | 0 | 51s |
-| RELIANCE.NS | BULLISH +0.500 | BULLISH +0.734 | 9/9 | 0.977 | 0 | 140s |
-| TCS.NS | NEUTRAL +0.246 | BULLISH +0.796 | 9/9 | 0.966 | 0 | 118s |
+| AAPL | NEUTRAL +0.294 | BULLISH +0.458 | 9/9 | 0.970 | 0 | 130s |
+| RELIANCE.NS | BULLISH +0.500 | BULLISH +0.734 | 9/9 | 0.971 | 0 | 137s |
+| TCS.NS | NEUTRAL +0.246 | BULLISH +0.796 | 9/9 | 0.971 | 0 | 183s |
 
 Artefacts: `runs/AAPL_final.json`, `runs/RELIANCE_full.json`, `runs/TCS_full.json`.
 Verdicts, scores, grounding rates, agent counts and run times are read back from those
-files. Two caveats. The AAPL run is a *resumed* run: it reused nine specialist outputs and
-the bull from an earlier file, so its 51s covers the bear, verification and judge only,
-and that earlier file is not part of this repository. And the construction-time token
-counts quoted in the failure-mode list below are not all reproducible from the tracked
-artefacts; where that is the case it now says so.
+files. All three are complete runs on the merged code, dated 2026-09-13, with nine of nine
+agents ok and no resumed stage, so every run time above covers the whole pipeline. One
+caveat stands: the construction-time token counts quoted in the failure-mode list below
+belong to the 2026-09-12 debugging runs, not to these artefacts, and they are not
+reproducible from them.
 
 The Bear earned its place on AAPL. Its six attacks in `runs/AAPL_final.json` go after the
-bull's load-bearing claims: that trailing margins prove durable pricing power (the bundle
-carries no peer benchmark or segment detail, so they cannot); that $98.77B of FCF funds
-buybacks "without external capital" (a ~2.0% FCF yield on a $4.85T market cap means
-buybacks retire shares at 38.15x earnings); that one annual OCF/NI of 1.0 is evidence of
-clean earnings quality (one ratio is not a trend); that 31.18% ROA proves a productive asset
-base (a trailing ratio with D/E 1.34 and cash at 10.0% of assets); and that a "confirmed
-uptrend" is a low-risk entry (RSI14 70.62 is overbought on volume 21.86% below its 20-day
-average). The judge recorded the same six as `bull_case_broken`.
+bull's load-bearing claims: that 46.91% gross and 31.97% operating margins prove durable
+pricing power (no peer, industry or historical benchmark sits in the bundle, so they
+cannot); that FCF conversion confirms cash quality ($98.8B of FCF on a $4.85T market cap is
+about a 2% yield, and one annual OCF/NI of 1.0 is a single period, not a trend); that price
+above the 50-day and 200-day averages is an intact uptrend (RSI 70.62 is overbought on
+volume 21.86% below its 20-day average, and price sits 2.21% under the 52-week high); that
+the 8.03% net share reduction lifts per-share value (buybacks at 45.15x book and 38.15x
+earnings can destroy value, and D/E of 1.34 points to leverage rather than spare cash); that
+ROA 31.18% and 6.43% revenue growth carry the case (ROE 151.91% is leverage-inflated and PEG
+2.61 says the growth is already priced); and that trend plus quality justify holding through
+volatility (a -33.36% max drawdown and 21.43% downside deviation say the trend did not
+protect capital). The judge kept five of the bull's claims and marked three broken: the
+OCF/NI conversion claim, the hold-through-volatility claim, and the buyback value-creation
+argument.
 
 The debate cannot move the verdict. The rubric is computed from the metric bundle before
 any agent runs, so the debate changes the narrative only. That is a property of the code,
@@ -116,14 +122,13 @@ not of these runs: no artefact stores a before/after verdict pair.
 **Unmatched numbers are zero across all three tickers**: every figure any agent wrote
 resolved either to an evidence value or to arithmetic over evidence values. Read that
 carefully, because the check is weaker than it sounds. Matching is value-level, not
-claim-level, and the derived index is generous: 52 AAPL evidence values generate ~4,000
+claim-level, and the derived index is generous: 66 AAPL evidence values generate ~6,400
 derived values, and that index accepts roughly 95% of random numbers in 0.05..100. So
-`unverified = 0` means "nothing obviously invented", not "every claim is grounded"; 12.9% of
-AAPL's 342 numbers matched only through the derived index. Two further accounting notes: the
-verifier skips bare 4-digit years after fixing the denominator, so the AAPL/RELIANCE/TCS
-`claims_found` of 342/258/175 includes 11/6/6 numbers that are neither verified nor
-unverified; and `runs/RELIANCE_full.json` records one citation violation, the `flows` agent
-citing `pillar_coverage.governance`.
+`unverified = 0` means "nothing obviously invented", not "every claim is grounded"; 17.8% of
+AAPL's 197 numbers matched only through the derived index. One accounting note: the verifier
+skips bare 4-digit years after fixing the denominator, so the AAPL/RELIANCE/TCS `claims_found`
+of 197/172/173 includes 6/5/5 numbers that are neither verified nor unverified. No run
+records a citation violation.
 
 
 
@@ -255,14 +260,15 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    -2, TSLA -1 to +1, XOM -1 to -2, HDFCBANK.NS refused to -2, HDB -2 to refused) and one
    verdict: HDB LONG_TERM NEUTRAL 0.313 to BULLISH 0.497, because a wrong -2 leaves the
    pillar. Governance coverage moves with the refusals: HDB 1.000 to 0.667, HDFCBANK.NS 0.667
-   to 1.000. **The tracked runs predate this change, and none of their machine-readable content
-   does.** `runs/*.json` record the 2026-09-12 paid runs, and no signal or score in them moves,
-   because no band moves: AAPL keeps +2 while the value quoted in its prose drifts -8.09% to
-   -8.03% (11 mentions), and TCS keeps +1 while its prose drifts -1.12% to -1.24% (7 mentions).
-   Repairing that prose means paying for new runs. The deterministic half is free: on
-   2026-09-13 `python analyze.py <SYM> --no-llm` reproduced all three published rows from live
-   data into a timestamped artefact of its own, AAPL NEUTRAL 0.294 / BULLISH 0.458,
-   RELIANCE.NS BULLISH 0.5 / 0.734 and TCS.NS NEUTRAL 0.246 / BULLISH 0.796.
+   to 1.000. **No signal or score moves in the tracked runs, and their prose now matches the
+   code.** The 2026-09-12 artefacts quoted the code they ran on: a share trend of -8.09% for
+   AAPL against today's -8.03%, and the pre-fix double-scaled dividend yields of 33.0, 295.0
+   and 48.0, which their prose described as data errors. Both went stale when the code changed.
+   On 2026-09-13 all three tickers were re-run on the merged code with the same model, and the
+   tracked artefacts are those runs: same rows, the deterministic block identical to the
+   2026-09-12 runs, grounding 0.970 to 0.971 and no unverified numbers. The deterministic half
+   of that check is free: `python analyze.py <SYM> --no-llm` reproduces the published rows from
+   live data into a timestamped artefact of its own.
    Guarded by `tests/test_metrics.py`, which covers the bonus repair, the quarterly fallback,
    the refusal when neither series is usable, the trend reading against the endpoint reading,
    one factor repairing one step, a reverse split with issuance, and a rubric check that a
@@ -287,10 +293,10 @@ always the adversarial one, which is the worst possible component to lose silent
 
 ## Data sources
 
-- **yfinance** 1.7.0 — prices, OHLCV, statements, split histories, quote metadata. US and NSE
+- **yfinance** 1.7.0: prices, OHLCV, statements, split histories, quote metadata. US and NSE
   (`.NS`). No key. Yahoo's `quoteSummary` endpoint is crumb-gated (401) for raw
   HTTP; the library handles it.
-- **SEC EDGAR XBRL** — `data.sec.gov/api/xbrl/companyfacts`. Free, requires a descriptive
+- **SEC EDGAR XBRL**: `data.sec.gov/api/xbrl/companyfacts`. Free, requires a descriptive
   User-Agent. `src/data.py` implements `sec_companyfacts` and `resolve_cik`, but nothing
   calls them yet, so every number in a run currently comes from yfinance.
 - **NSE India direct** returns 403 from the machine this was built on; India coverage comes

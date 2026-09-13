@@ -48,12 +48,15 @@ intact in every change: the LLM layer interprets, the Python layer decides.
    `runs/*.json` and the README tables from the actual output.
    `python analyze.py <SYM> --no-llm` does the deterministic half for free and writes
    its own timestamped artefact: use it to re-derive the published scores. The tracked
-   `runs/*.json` are dated records of a paid run, so their prose keeps the values of the
-   code that produced it. State the drift in the README; do not splice new numbers into
-   an old run.
+   `runs/*.json` are dated records of a paid run, so their prose carries the values of the
+   code that produced it. **Refresh the affected tickers rather than splice numbers into an
+   old run**: one paid run per ticker costs about 50k tokens and two to three minutes, and a
+   spliced record claims the agents said something they did not.
 7. **No em dashes (U+2014) anywhere.** Code comments, README, docstrings, PR
    descriptions, commit messages. Use a colon, semicolon, parentheses or a
-   new sentence.
+   new sentence. This covers agent prose in `runs/*.json` too: the model is asked not to
+   emit the character, and `strip_em_dashes` in `src/agents.py` rewrites it to a comma on
+   the way in, so a run cannot ship one.
 
 ## Working conventions
 
@@ -148,6 +151,16 @@ describes, and name the decision it needs.
   older ones, so any metric that reads a span of annual columns must assume
   mixed bases. `share_dilution_pct` repairs a step a recorded factor explains and
   falls back to the restated quarterly series otherwise; no other metric does yet.
+- Ollama cloud models on this workstation go through the local daemon, not
+  `https://ollama.com/v1`: `OLLAMA_API_KEY` here is the placeholder `ollama-local`, so a
+  direct call returns 401 and all nine agents report `unavailable`, while `127.0.0.1:11434`
+  holds the account credential and serves the same cloud models. Run with the placeholder
+  key and `EA_BASE_URL=http://localhost:11434/v1`. Re-check:
+
+  ```bash
+  curl -s http://localhost:11434/v1/chat/completions -H "Content-Type: application/json" \
+    -d '{"model":"deepseek-v4.1-flash:cloud","messages":[{"role":"user","content":"ok"}],"max_tokens":4}'
+  ```
 
 ## Review artifacts from the 2026-09-12 sweep
 
