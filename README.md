@@ -223,10 +223,11 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    because SEC's policy asks for one and enforcement is theirs to change. The SEC
    helpers in `src/data.py` are still called by nothing, so no run depends on this.
 
-9. **Corporate action read as dilution.** `share_dilution_pct` is now the change implied by
-   the least-squares line through log(average shares) across the columns yfinance returns.
-   Three mechanisms replaced the first guard, which refused the metric whenever a doubling
-   or halving coincided with a split inside the statement window.
+9. **Corporate action read as dilution.** `share_dilution_pct` is the log-least-squares change
+   in average shares across the reported columns. The decisions behind it are in
+   [AGENTS.md](AGENTS.md#owner-decisions-on-the-share-count-metric-2026-09-13), the measurements
+   are here. Three mechanisms replaced the first guard, which refused the metric whenever a
+   doubling or halving coincided with a split inside the statement window.
 
    **The step is repaired, not refused.** yfinance can restate the annual columns of a bonus
    issue for the newer periods and leave the older ones, so one series mixes two bases:
@@ -235,26 +236,23 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    against last read the window as **+175.75%**, scoring the `dilution` signal at -2. The step
    is that bonus plus the year's real issuance (2.155 = 2.0 x 1.078), so the older columns are
    rebased and the metric reports what is left, **+36.56%**: the merger, which keeps its -2.
-   The factor comes from the full split history (`Ticker.splits`), not the two-year price
-   series, because 9 of the 17 in-window splits in this sample are older than that window
-   (NVDA 10:1 on 2024-06-10, NVO 2:1 on 2023-09-20, GE 1.281 and 1.253, MMM 1.196). Only
-   ratios at or below 0.9 or at or above 1.5 count as factors: near-1 ratios are distributions
-   and ADR-ratio changes (SPGI 1.057, HON 0.9535, UL 0.888) and cannot rebase a share count.
+   The factor has to come from `Ticker.splits`: 9 of the 17 in-window splits in this sample are
+   older than the two-year price window (NVDA 10:1 on 2024-06-10, NVO 2:1 on 2023-09-20, GE
+   1.281 and 1.253, MMM 1.196). Factors outside 0.9 to 1.5 are excluded, which is what the
+   near-1 ratios are: distributions and ADR-ratio changes (SPGI 1.057, HON 0.9535, UL 0.888).
 
    **A series that still mixes bases falls back to the restated quarterly columns.** An
    implausible step in each direction means two bases rather than two corporate actions: HDB
-   (ADS listing,
-   3.709bn -> 1.862bn -> 4.738bn) and TRV (a 23.11bn column where the years either side are
-   0.23bn). TRV reads -7.04% from its quarterly columns, a buyback that keeps its +2. HDB has
-   only two quarterly columns, which is a comparison rather than a trend, so it is refused.
-   The same fallback is the basis check: a disagreement between the annual and quarterly
-   columns for one fiscal period puts the restated quarterly series in charge, which moves
-   COF (14.3% apart), INTC (6.71%) and BA (5.16%) onto it.
+   (ADS listing, 3.709bn -> 1.862bn -> 4.738bn) and TRV (a 23.11bn column where the years
+   either side are 0.23bn). TRV reads -7.04% from its quarterly columns, a buyback that keeps
+   its +2. HDB has only two quarterly columns, which is a comparison rather than a trend, so it
+   is refused. The basis check moves the same three names onto those columns: COF, 14.3% apart,
+   and INTC (6.71%) and BA (5.16%).
 
    **Issuance keeps its score.** A count that doubles with no split behind it is an all-stock
-   acquisition or sustained equity financing and keeps its -2, because refusing it would
-   delete a real dilution penalty and flatter the company. The widest real cases in the sample
-   are Realty Income at +48.5% (repeated raises) and AIG at -27.6% (sustained buybacks).
+   acquisition or sustained equity financing, and keeps its -2: refusing it would delete a real
+   dilution penalty. The widest real cases in the sample are Realty Income at +48.5% (repeated
+   raises) and AIG at -27.6% (sustained buybacks).
 
    Across the 115-ticker sample the change moves six dilution signals (ALL -1 to 0, PDD -1 to
    -2, TSLA -1 to +1, XOM -1 to -2, HDFCBANK.NS refused to -2, HDB -2 to refused) and one
@@ -266,13 +264,11 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    and 48.0, which their prose described as data errors. Both went stale when the code changed.
    On 2026-09-13 all three tickers were re-run on the merged code with the same model, and the
    tracked artefacts are those runs: same rows, the deterministic block identical to the
-   2026-09-12 runs, grounding 0.970 to 0.971 and no unverified numbers. The deterministic half
-   of that check is free: `python analyze.py <SYM> --no-llm` reproduces the published rows from
-   live data into a timestamped artefact of its own.
-   Guarded by `tests/test_metrics.py`, which covers the bonus repair, the quarterly fallback,
-   the refusal when neither series is usable, the trend reading against the endpoint reading,
-   one factor repairing one step, a reverse split with issuance, and a rubric check that a
-   refused value is unavailable rather than scored.
+   2026-09-12 runs, grounding 0.970 to 0.971 and no unverified numbers.
+   Guarded by `tests/test_metrics.py`: the bonus repair, the quarterly fallback, the refusal
+   when neither series is usable, the trend reading against the endpoint reading, one factor
+   repairing one step, a reverse split with issuance, and a rubric check that a refused value
+   is unavailable rather than scored.
 
 **Fabrication is treated as worse than absence.** A failed agent returns
 `status="unavailable"` with an error string, never plausible-looking prose: a truncated
