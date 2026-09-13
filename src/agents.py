@@ -267,6 +267,40 @@ def check_limits(data: dict, limits, trim: bool = True) -> tuple[list[str], list
     return violations, retryable
 
 
+def specialist_payload(bundle: dict, name: str) -> dict:
+    """The payload one specialist agent receives. Shared with the resume path."""
+    return {
+        "symbol": bundle["symbol"],
+        "market": bundle["market"],
+        "pillars": bundle["pillars"],
+        "context": bundle.get("context", {}),
+        "extras": bundle.get("extras", {}),
+        "pillar_coverage": bundle.get("pillar_coverage", {}),
+        "data_quality": bundle.get("data_quality", {}),
+        "focus": {
+            "fundamentals": ["fundamentals"],
+            "valuation": ["valuation"],
+            "technicals": ["technicals"],
+            "risk": ["risk"],
+            "governance": ["governance"],
+        }.get(name, []),
+    }
+
+
+def audit_result(name: str, data: dict, payload: dict | None = None,
+                 trim: bool = True) -> tuple[list[str], list[str]]:
+    """The protocol checks for one agent output: key paths and output limits.
+
+    Run on every fresh response, and again on anything restored by `--resume`. A
+    resumed result is re-checked rather than trusted: stored before these checks
+    existed, a 12 argument bull case would ship as compliant with an empty violation
+    list, and it would enlarge every payload built from it.
+    """
+    limits = LIMITS_BY_AGENT.get((name or "").lower(), SPECIALIST_LIMITS)
+    violations, retryable = check_limits(data, limits, trim=trim)
+    return _check_citations(data, payload or {}) + violations, retryable
+
+
 def bull_view(bull) -> dict:
     """The bull case as the bear sees it: the protocol caps, nothing else."""
     data = bull.data if hasattr(bull, "data") else (bull or {})
@@ -383,16 +417,25 @@ def _check_citations(data: dict, bundle: dict) -> list[str]:
     # The debate agents cite a path per item, in a field the citation list does not
     # cover: "evidence" beside each bull argument and each bear attack, plus the bear's
     # strongest metric. Checked against the same allowlist, because an unchecked key
-    # path is how a fabricated provenance reads as rigorous.
+    # path is how a fabricated provenance reads as rigorous. A missing or malformed
+    # path is a violation in its own right: skipping it would leave an unsupported
+    # claim uninspected, which is the failure the check exists to prevent.
     cited = list(cited)
+    bad: list[str] = []
     for field in ("arguments", "attacks"):
-        for item in data.get(field) or []:
-            if isinstance(item, dict) and isinstance(item.get("evidence"), str):
-                cited.append(item["evidence"])
+        for i, item in enumerate(data.get(field) or []):
+            path = item.get("evidence") if isinstance(item, dict) else None
+            if isinstance(path, str) and path.strip():
+                cited.append(path)
+            else:
+                bad.append(f"missing evidence key: {field}[{i}]")
     strongest = data.get("strongest_bear_metric")
-    if isinstance(strongest, dict) and isinstance(strongest.get("key"), str):
-        cited.append(strongest["key"])
-    bad = []
+    if isinstance(strongest, dict):
+        key = strongest.get("key")
+        if isinstance(key, str) and key.strip():
+            cited.append(key)
+        else:
+            bad.append("missing evidence key: strongest_bear_metric.key")
     for c in cited:
         if not isinstance(c, str):
             continue
@@ -419,9 +462,9 @@ def call_agent(name: str, system: str, payload: dict, model: str = DEFAULT_MODEL
     """
     user = json.dumps(payload, indent=1, default=str)[:14000]
     last_err = ""
-    limits = LIMITS_BY_AGENT.get((name or "").lower(), SPECIALIST_LIMITS)
     best: AgentResult | None = None
     correction = ""
+    corrected = False
     for attempt in range(retries + 1):
         try:
             kwargs = {"response_format": {"type": "json_object"}} if strict_json else {}
@@ -445,25 +488,27 @@ def call_agent(name: str, system: str, payload: dict, model: str = DEFAULT_MODEL
                 last_err = f"unparseable JSON on attempt {attempt + 1} (finish={choice.finish_reason})"
                 continue
             data = strip_em_dashes(data)
-            violations, retryable = check_limits(data, limits)
+            violations, retryable = audit_result(name, data, payload)
             result = AgentResult(
                 name=name, status="ok", data=data, raw=raw, model=model, tokens=tokens,
-                violations=_check_citations(data, payload) + violations,
+                violations=violations,
             )
             # Keep the cleanest attempt. A result with no limit violation is returned at
-            # once; a violating one is re-asked once with the broken limits restated,
-            # and the attempt with the fewest violations wins if none comes back clean.
+            # once. A word overrun earns exactly one corrective re-call with the broken
+            # limits restated, and after that the attempt with the fewest violations
+            # wins, which is not always the last one.
             if best is None or len(result.violations) < len(best.violations):
                 best = result
             if not violations:
                 return result
-            if retryable and attempt < retries:
+            if retryable and not corrected and attempt < retries:
+                corrected = True
                 correction = ("\n\nCORRECTION from the pipeline: the previous answer broke "
                               "the stated output limits: " + "; ".join(retryable) +
                               ". Return the same analysis again, inside every limit. Cut "
                               "filler and repetition, not substance.")
                 continue
-            return result
+            return best
         except Exception as e:
             last_err = f"{type(e).__name__}: {str(e)[:200]}"
     if best is not None:
@@ -487,22 +532,7 @@ def call_with_fallback(name: str, system: str, payload: dict, model: str = DEFAU
 
 def run_specialists(bundle: dict, model: str = DEFAULT_MODEL, workers: int = 9) -> dict:
     def one(name: str) -> AgentResult:
-        payload = {
-            "symbol": bundle["symbol"],
-            "market": bundle["market"],
-            "pillars": bundle["pillars"],
-            "context": bundle.get("context", {}),
-            "extras": bundle.get("extras", {}),
-            "pillar_coverage": bundle.get("pillar_coverage", {}),
-            "data_quality": bundle.get("data_quality", {}),
-            "focus": {
-                "fundamentals": ["fundamentals"],
-                "valuation": ["valuation"],
-                "technicals": ["technicals"],
-                "risk": ["risk"],
-                "governance": ["governance"],
-            }.get(name, []),
-        }
+        payload = specialist_payload(bundle, name)
         return call_with_fallback(
             name,
             AGENT_SYSTEM.format(name=name, remit=SPECIALISTS[name]),

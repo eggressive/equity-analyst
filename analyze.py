@@ -168,7 +168,15 @@ def run(symbol: str, model: str | None = None, no_llm: bool = False, quiet: bool
     if reused:
         if not quiet:
             print(f"  reusing {len(reused)} ok agent(s) from {resume}")
-        done = {n: _result_from_dict(d) for n, d in reused.items()}
+        done = {}
+        for n, d in reused.items():
+            restored = _result_from_dict(d)
+            # A resumed result is re-checked, not trusted: stored before the limit and
+            # key path checks existed, it would otherwise ship as compliant with an empty
+            # violation list, and every payload built from it would carry the overrun.
+            restored.violations = agent_mod.audit_result(
+                n, restored.data, agent_mod.specialist_payload(bundle, n))[0]
+            done[n] = restored
         missing = {n: _result_from_dict({"agent": n, "status": "unavailable", "data": {},
                                          "error": "not in resume set"})
                    for n in agent_mod.SPECIALISTS if n not in done}
@@ -189,6 +197,7 @@ def run(symbol: str, model: str | None = None, no_llm: bool = False, quiet: bool
             print("  reusing bull case, running bear...")
         bull = _result_from_dict(prev_bull)
         compact = agent_mod._compact_bundle(bundle)
+        bull.violations = agent_mod.audit_result("bull", bull.data, compact)[0]
         # Same trim as the run path: one helper, so the resumed bear sees exactly the
         # case a fresh run would hand it.
         bear = agent_mod.call_with_fallback(

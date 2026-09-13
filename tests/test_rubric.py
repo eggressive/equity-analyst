@@ -440,6 +440,80 @@ def test_over_limit_output_is_reasked_once_and_the_cleaner_attempt_wins():
     assert "CORRECTION from the pipeline" in calls[1], calls[1]
 
 
+def test_debate_items_must_carry_an_evidence_path():
+    """A missing, empty or non-string evidence path is a violation in its own right.
+    Skipping it would leave the unsupported claim uninspected, which is the failure the
+    check exists to prevent."""
+    bundle = {"pillars": {"valuation": {"peg": 2.61}}}
+    out = agents._check_citations(
+        {"arguments": [{"claim": "a"}, {"claim": "b", "evidence": ""},
+                       {"claim": "c", "evidence": 3.5},
+                       {"claim": "d", "evidence": "valuation.peg"}]}, bundle)
+    assert out == ["missing evidence key: arguments[0]",
+                   "missing evidence key: arguments[1]",
+                   "missing evidence key: arguments[2]"], out
+    out = agents._check_citations({"attacks": [{"counter": "c"}],
+                                   "strongest_bear_metric": {"value": 2.61}}, bundle)
+    assert out == ["missing evidence key: attacks[0]",
+                   "missing evidence key: strongest_bear_metric.key"], out
+
+
+def test_a_restored_result_is_revalidated():
+    """A resumed run is re-checked rather than trusted. Stored before the checks existed,
+    this bull case would ship as compliant with an empty violation list."""
+    stored = {"thesis": " ".join(["t"] * 143),
+              "arguments": [{"claim": "c", "evidence": "valuation.peg"}] * 12,
+              "what_would_break_this": ["b"] * 9}
+    violations, retryable = agents.audit_result("bull", stored, {})
+    assert len(stored["arguments"]) == 5, stored
+    assert len(stored["what_would_break_this"]) == 4, stored
+    assert any("thesis is 143 words" in v for v in violations), violations
+    assert any("arguments had 12 items" in v for v in violations), violations
+    assert any("thesis is 143 words" in v for v in retryable), retryable
+
+
+def test_one_corrective_recall_and_the_cleaner_attempt_wins():
+    """The re-call happens once, not once per retry, and when it comes back worse the
+    cleaner earlier attempt is the answer."""
+    calls = []
+
+    class FakeCompletions:
+        def create(self, **kw):
+            calls.append(kw["messages"][-1]["content"])
+            first = len(calls) == 1
+            body = {
+                "summary": " ".join(["w"] * (70 if first else 90)),
+                "key_points": [" ".join(["p"] * 30)] * (3 if first else 7),
+                "cited_metrics": ["fundamentals.net_margin_pct"],
+                "evidence_gaps": [],
+            }
+            class Choice:
+                finish_reason = "stop"
+                message = type("M", (), {"content": json.dumps(body)})
+
+            class Usage:
+                total_tokens = 10
+            return type("R", (), {"choices": [Choice()], "usage": Usage()})
+
+    class FakeClient:
+        chat = type("C", (), {"completions": FakeCompletions()})
+
+    payload = {"pillars": {"fundamentals": {"net_margin_pct": 22.0}}}
+    saved = agents._client
+    agents._client = FakeClient()
+    try:
+        res = agents.call_agent("fundamentals", agents.AGENT_SYSTEM.format(
+            name="fundamentals", remit=agents.SPECIALISTS["fundamentals"]), payload,
+            strict_json=False)
+    finally:
+        agents._client = saved
+    assert res.status == "ok", res.error
+    assert len(calls) == 2, calls
+    assert "CORRECTION from the pipeline" in calls[1], calls[1]
+    assert len(res.data["summary"].split()) == 70, res.data
+    assert res.violations, res.violations
+
+
 def test_news_count_survives_the_verify_extras_merge():
     """The bundle carries a headline count, not the list. Recomputing the count from
     the missing list wrote zero and left a sentiment agent citing 10 ungrounded."""

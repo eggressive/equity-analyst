@@ -331,12 +331,15 @@ coverage.
     **Fixed 2026-09-13.** `check_limits` trims an item overrun in place and records it,
     re-asks once when a word overrun arrives and records it if the re-ask fails, and the
     key path beside every bull argument and bear attack is now checked against the bundle
-    like any other citation. Violations are reported per agent, debate agents included, in
-    `verification.agent_violations` and in `warnings`. The three tracked runs are inside
-    every limit, so enforcement changed none of their numbers, and no run has yet recorded
-    a violation. Guarded by `tests/test_rubric.py`: the caps are applied, a word overrun
-    survives untouched, the corrective re-call happens once, and an invented debate key
-    path is caught.
+    like any other citation, and a missing or malformed path is itself a violation. A
+    result restored by `--resume` is re-checked rather than trusted, so a stored overrun
+    cannot ship as compliant with an empty violation list. Violations are reported per
+    agent, debate agents included, in `verification.agent_violations` and in `warnings`.
+    The three tracked runs are inside every limit, so enforcement changed none of their
+    numbers, and no run has yet recorded a violation. Guarded by `tests/test_rubric.py`:
+    the caps are applied, a word overrun survives untouched, exactly one corrective
+    re-call happens and the cleaner attempt wins, an invented or absent debate key path
+    is caught, and a restored result is re-audited.
 
 **Fabrication is treated as worse than absence.** A failed agent returns
 `status="unavailable"` with an error string, never plausible-looking prose: a truncated
@@ -355,7 +358,8 @@ and these models do not stop at a requested JSON size. Three layers bound every 
 2. **`check_limits` enforces them in Python.** An item overrun is trimmed in place: the
    protocol caps the count, and the rest of the pipeline sees a trimmed view anyway. A
    word overrun is re-asked once with the broken limits restated, then kept intact and
-   recorded, because cutting prose mid-sentence loses meaning silently.
+   recorded, because cutting prose mid-sentence loses meaning silently. The cleanest
+   attempt wins, and a result restored by `--resume` goes through the same audit.
 3. **The payload is bounded.** The bear sees the bull case trimmed to the protocol caps
    and to claim plus key path, from one helper shared by the run and the resume path.
    The bear's output is proportional to its input, so the adversarial agent is always
