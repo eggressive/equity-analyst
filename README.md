@@ -299,8 +299,6 @@ always the adversarial one, which is the worst possible component to lose silent
 - **SEC EDGAR XBRL**: `data.sec.gov/api/xbrl/companyfacts`. Free, requires a descriptive
   User-Agent. `src/data.py` implements `sec_companyfacts` and `resolve_cik`, but nothing
   calls them yet, so every number in a run currently comes from yfinance.
-- **NSE India direct** returns 403 from the machine this was built on; India coverage comes
-  through yfinance `.NS` symbols, which work.
 
 ## Scope
 
