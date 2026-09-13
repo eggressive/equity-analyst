@@ -218,38 +218,55 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    because SEC's policy asks for one and enforcement is theirs to change. The SEC
    helpers in `src/data.py` are still called by nothing, so no run depends on this.
 
-9. **Corporate action read as dilution.** `share_dilution_pct` compares the newest
-   annual share count against the oldest. yfinance can restate the annual columns of a
-   bonus issue or split for the newer periods and leave the older ones, so one series
-   then mixes two bases: HDFCBANK.NS carries 7.107bn shares for FY2024 (pre-bonus) next
-   to 15.319bn for FY2025 (post-bonus), a step of 2.155x that matches its 1:1 bonus of
-   2025-08-26, and the metric read the window as **+175.75%**, scoring the `dilution`
-   signal at -2. That restatement is not the general rule: across the 17 in-window split
-   events in the same sample only this one shows a step at the split factor, which is why
-   the guard needs the split as evidence rather than inferring an artefact from the size
-   of the change. The metric is now refused when two things hold together: the change
-   doubles or halves the count across the window, and a material split or bonus (1.5:1 or
-   larger, or its reverse) is dated inside the statement window, read from the full split
-   history rather than the two-year price window, because 17 splits sit inside a statement
-   window in this sample and 9 of them are invisible to a two-year price series (NVDA 10:1
-   on 2024-06-10, NVO 2:1 on 2023-09-20, GE 1.281 and 1.253, MMM 1.196). The refusal is
-   ordinary missing data, so governance coverage drops from 0.5 to 0.375 and the signal
-   leaves the pillar instead of scoring a corporate action.
-   **The split is required evidence, not a magnitude test.** A count that doubles with no
-   split behind it is issuance — an all-stock acquisition or sustained equity financing —
-   and keeps its -2, because refusing it would delete a real dilution penalty and flatter
-   the company. In a 115-ticker sample 8 tickers have a material split inside their
-   statement window and 1 of them leaves the band, so the two conditions refuse exactly
-   one ticker, and the other 7 keep their numbers. Real issuance and buybacks inside the
-   band are unchanged: the widest are Realty Income at +48.5% (repeated equity raises) and
-   AIG at -27.6% (sustained buybacks). Guarded by `tests/test_metrics.py`, including both
-   band boundaries with split evidence, a doubling with no split, a split older than the
-   window, a spin-off-sized adjustment of 1.061, and a rubric check that a refused value
-   is unavailable rather than scored. Three honest limits: the guard refuses the artefact
-   rather than computing the true value, which for HDFCBANK.NS is +0.57% for the latest
-   year; a moderate artefact stays invisible to it, because the HDFC Bank ADS listing HDB
-   reports 37.67% where the latest year is 7.77%; and a bonus that yfinance records as a
-   stock dividend rather than a split carries no evidence, so it keeps its number.
+9. **Corporate action read as dilution.** `share_dilution_pct` is now the change implied by
+   the least-squares line through log(average shares) across the columns yfinance returns.
+   Three mechanisms replaced the first guard, which refused the metric whenever a doubling
+   or halving coincided with a split inside the statement window.
+
+   **The step is repaired, not refused.** yfinance can restate the annual columns of a bonus
+   issue for the newer periods and leave the older ones, so one series mixes two bases:
+   HDFCBANK.NS carries 7.107bn shares for FY2024 (pre-bonus) next to 15.319bn for FY2025
+   (post-bonus), a step of 2.155x against its recorded 1:1 bonus of 2025-08-26, and first
+   against last read the window as **+175.75%**, scoring the `dilution` signal at -2. The step
+   is that bonus plus the year's real issuance (2.155 = 2.0 x 1.078), so the older columns are
+   rebased and the metric reports what is left, **+36.56%**: the merger, which keeps its -2.
+   The factor comes from the full split history (`Ticker.splits`), not the two-year price
+   series, because 9 of the 17 in-window splits in this sample are older than that window
+   (NVDA 10:1 on 2024-06-10, NVO 2:1 on 2023-09-20, GE 1.281 and 1.253, MMM 1.196). Only
+   ratios at or below 0.9 or at or above 1.5 count as factors: near-1 ratios are distributions
+   and ADR-ratio changes (SPGI 1.057, HON 0.9535, UL 0.888) and cannot rebase a share count.
+
+   **A series that still mixes bases falls back to the restated quarterly columns.** An
+   implausible step in each direction means two bases rather than two corporate actions: HDB
+   (ADS listing,
+   3.709bn -> 1.862bn -> 4.738bn) and TRV (a 23.11bn column where the years either side are
+   0.23bn). TRV reads -7.04% from its quarterly columns, a buyback that keeps its +2. HDB has
+   only two quarterly columns, which is a comparison rather than a trend, so it is refused.
+   The same fallback is the basis check: a disagreement between the annual and quarterly
+   columns for one fiscal period puts the restated quarterly series in charge, which moves
+   COF (14.3% apart), INTC (6.71%) and BA (5.16%) onto it.
+
+   **Issuance keeps its score.** A count that doubles with no split behind it is an all-stock
+   acquisition or sustained equity financing and keeps its -2, because refusing it would
+   delete a real dilution penalty and flatter the company. The widest real cases in the sample
+   are Realty Income at +48.5% (repeated raises) and AIG at -27.6% (sustained buybacks).
+
+   Across the 115-ticker sample the change moves six dilution signals (ALL -1 to 0, PDD -1 to
+   -2, TSLA -1 to +1, XOM -1 to -2, HDFCBANK.NS refused to -2, HDB -2 to refused) and one
+   verdict: HDB LONG_TERM NEUTRAL 0.313 to BULLISH 0.497, because a wrong -2 leaves the
+   pillar. Governance coverage moves with the refusals: HDB 1.000 to 0.667, HDFCBANK.NS 0.667
+   to 1.000. **The tracked runs predate this change, and none of their machine-readable content
+   does.** `runs/*.json` record the 2026-09-12 paid runs, and no signal or score in them moves,
+   because no band moves: AAPL keeps +2 while the value quoted in its prose drifts -8.09% to
+   -8.03% (11 mentions), and TCS keeps +1 while its prose drifts -1.12% to -1.24% (7 mentions).
+   Repairing that prose means paying for new runs. The deterministic half is free: on
+   2026-09-13 `python analyze.py <SYM> --no-llm` reproduced all three published rows from live
+   data into a timestamped artefact of its own, AAPL NEUTRAL 0.294 / BULLISH 0.458,
+   RELIANCE.NS BULLISH 0.5 / 0.734 and TCS.NS NEUTRAL 0.246 / BULLISH 0.796.
+   Guarded by `tests/test_metrics.py`, which covers the bonus repair, the quarterly fallback,
+   the refusal when neither series is usable, the trend reading against the endpoint reading,
+   one factor repairing one step, a reverse split with issuance, and a rubric check that a
+   refused value is unavailable rather than scored.
 
 **Fabrication is treated as worse than absence.** A failed agent returns
 `status="unavailable"` with an error string, never plausible-looking prose: a truncated

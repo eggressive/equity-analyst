@@ -46,6 +46,11 @@ intact in every change: the LLM layer interprets, the Python layer decides.
 6. **README numbers are read back from artefacts, not typed.** When you change
    scoring or metrics, rerun the affected tickers and update
    `runs/*.json` and the README tables from the actual output.
+   `python analyze.py <SYM> --no-llm` does the deterministic half for free and writes
+   its own timestamped artefact: use it to re-derive the published scores. The tracked
+   `runs/*.json` are dated records of a paid run, so their prose keeps the values of the
+   code that produced it. State the drift in the README; do not splice new numbers into
+   an old run.
 7. **No em dashes (U+2014) anywhere.** Code comments, README, docstrings, PR
    descriptions, commit messages. Use a colon, semicolon, parentheses or a
    new sentence.
@@ -105,24 +110,22 @@ comments alike.
 - **Don't duplicate content across documents.** Link to the one that owns
   the topic.
 
-## Known live defects and owner decisions (do not fix unilaterally)
+## Owner decisions on the share-count metric (2026-09-13)
 
-Tracked from the 2026-09-12 corpus review. These need the owner's decision
-before code changes:
+All four items from the 2026-09-12 review are decided and implemented.
+`README.md` failure mode 9 owns the measurements; the code is in `src/metrics.py`.
 
-1. `share_dilution_pct` definition: whole window vs latest fiscal year vs
-   trend. Latest-year changes the score for 62 of 114 corpus tickers
-   (48 toward neutral, 14 against). Policy call.
-2. Split-aware computation instead of refusal: match a step's ratio to the
-   split factor from `price_history["Stock Splits"]`. Constraints from the
-   sweep: bound the factor to <= 0.9 or >= 1.5 (near-1 factors are
-   distributions and ADR-ratio changes, e.g. SPGI 1.057 is the MBGL
-   distribution), and HDB (ADS listing) must yield None: its 154% step stacks
-   a bonus with an ADR-ratio change and cannot be repaired by step matching.
-3. Basis check: prefer the restated `quarterly_income` series, or refuse the
-   annual series when the two disagree for the same period.
-4. Window coverage: 2-year price history cannot see splits older than the
-   window; `Ticker.splits` or a longer period fixes it.
+| Item | Decision |
+|------|----------|
+| `share_dilution_pct` definition | **Trend**, not the window endpoints: the change implied by the least-squares line through log(average shares). |
+| Split-aware computation | **Compute**. A step a recorded split factor explains is repaired instead of refusing the metric. Factors are bound to <= 0.9 or >= 1.5, which keeps distributions and ADR-ratio changes out. HDB still yields None, now because no factor matches its steps. |
+| Basis check | The restated `quarterly_income` series is measured when the annual and quarterly columns disagree for one fiscal period, or when the annual steps stay implausible after repair. |
+| Split-history window | The full history from `Ticker.splits`, one extra call, not the two-year price series. |
+
+## Known live defects (do not fix unilaterally)
+
+Nothing is tracked here right now. Add an entry before changing the behaviour it
+describes, and name the decision it needs.
 
 ## Data-source pitfalls (verified on this machine)
 
@@ -142,8 +145,9 @@ before code changes:
 - Yahoo's `quoteSummary` is crumb-gated (401) for raw HTTP; the library
   handles it, so do not hand-roll requests to Yahoo endpoints.
 - yfinance restates the newer annual columns of a split or bonus but not the
-  older ones. Any metric that reads a span of annual columns must assume
-  mixed bases until the split-aware work lands.
+  older ones, so any metric that reads a span of annual columns must assume
+  mixed bases. `share_dilution_pct` repairs a step a recorded factor explains and
+  falls back to the restated quarterly series otherwise; no other metric does yet.
 
 ## Review artifacts from the 2026-09-12 sweep
 
