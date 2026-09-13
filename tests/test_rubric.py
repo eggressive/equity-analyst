@@ -8,8 +8,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import agents  # noqa: E402
+import analyze  # noqa: E402
 import rubric  # noqa: E402
 import verify  # noqa: E402
 
@@ -238,6 +240,177 @@ def test_verification_credits_sourced_extras():
     extras = {"institutional_holders": [{"holder": "Blackrock", "value": 386428980144.0}]}
     v = verify.verify_claims("Blackrock holds 386,428,980,144 in value.", PILLARS, extras=extras)
     assert v["unverified"] == 0, v
+
+
+def test_b_and_t_suffixed_money_keeps_its_magnitude():
+    """'$416.2B' used to parse as 416: no unit for B or T, and the lookahead then cut
+    the match at the decimal point. Agents write magnitudes this way constantly."""
+    assert verify.extract_numbers("Revenue of $416.2B") == [(416.2e9, "b")]
+    pillars = {"fundamentals": {"revenue": 416.2e9}, "valuation": {"market_cap": 4.85e12}}
+    v = verify.verify_claims("Revenue of $416.2B on a $4.85T market cap.", pillars)
+    assert v["claims_found"] == 2 and v["unverified"] == 0, v
+
+
+def test_iso_date_digits_are_not_claims():
+    """A date is not evidence. Its month and day used to be counted, and a fragment
+    like 10 then collided with an unrelated metric value."""
+    v = verify.verify_claims(
+        "Next earnings on 2026-10-29, seven weeks after 2026-09-13.", PILLARS
+    )
+    assert v["claims_found"] == 0, v
+
+
+def test_window_digits_are_not_claims():
+    """'the 50- and 200-day averages' names two windows. Only the second used to be
+    masked, so the 50 became a claim."""
+    v = verify.verify_claims("Price is below the 50- and 200-day averages.", PILLARS)
+    assert v["claims_found"] == 0, v
+
+
+def test_a_signed_metric_accepts_the_magnitude_an_agent_states():
+    """'Shares fell 1.5%' describes a metric recorded as -1.5. Sign is not the claim."""
+    v = verify.verify_claims("Shares fell 1.5% and the drawdown reached 22.0%.", PILLARS)
+    assert v["unverified"] == 0, v
+
+
+def test_unrelated_metrics_do_not_derive_a_value():
+    """pe_ttm / revenue_growth is cross-pillar with no price or level metric in the
+    pair, so 5.0 is not in the acceptable set. The same pair inside one pillar is,
+    which is the difference between arithmetic and coincidence."""
+    cross = {"valuation": {"pe_ttm": 40.0}, "fundamentals": {"revenue_growth_yoy_pct": 8.0}}
+    v = verify.verify_claims("The P/E of 5.0 against revenue growth.", cross)
+    assert v["unverified"] == 1, v
+    same = {"valuation": {"pe_ttm": 40.0, "ev_to_ebitda": 8.0}}
+    v2 = verify.verify_claims("The P/E of 5.0 against EV/EBITDA.", same)
+    assert v2["unverified"] == 0, v2
+
+
+def test_derived_value_needs_both_operands_named():
+    """Revenue 100 and free cash flow 50 make 2x. Naming no operand, or one, is not
+    a derivation: only the sentence that names both is grounded."""
+    pillars = {"fundamentals": {"revenue": 100.0, "fcf": 50.0}}
+    assert verify.verify_claims("The figure is 2x.", pillars)["unverified"] == 1
+    assert verify.verify_claims("Revenue doubled by 2x.", pillars)["unverified"] == 1
+    assert verify.verify_claims("Revenue is 2x free cash flow.", pillars)["unverified"] == 0
+
+
+def test_money_and_multiples_do_not_read_as_a_hundredth():
+    """A percentage-stored metric accepts its fraction form, so 0.2692 is 26.92% of
+    margin. A PE of 40 is not 0.4x, and 416.2B of revenue is not 4.162B."""
+    pct = {"fundamentals": {"net_margin_pct": 26.92}}
+    assert verify.verify_claims("The margin sits at 0.2692.", pct)["unverified"] == 0
+    money = {"valuation": {"pe_ttm": 40.0}, "fundamentals": {"revenue": 416.2e9}}
+    assert verify.verify_claims("The PE sits at 0.4x.", money)["unverified"] == 1
+    assert verify.verify_claims("Revenue is 4162000000.", money)["unverified"] == 1
+
+
+def test_written_dates_are_not_claims():
+    """A day of the month is a date, not a figure: the tracked RELIANCE.NS bear read
+    "the October 16 earnings date" as the claim 16."""
+    v = verify.verify_claims("The October 16 earnings date is the near-term catalyst.", {})
+    assert v["claims_found"] == 0, v
+    v2 = verify.verify_claims("Earnings land on 16 October 2026.", {})
+    assert v2["claims_found"] == 0, v2
+    v3 = verify.verify_claims("Revenue grew 5% ahead of October 16.", {})
+    assert v3["claims_found"] == 1, v3
+    # "margin" and "market" open with the letters of March and May. A first cut of
+    # this mask ate two real claims per run: "gross margin 46.91%" lost its 46.91.
+    v4 = verify.verify_claims("Gross margin 46.91% and operating margin 11.48%.", {})
+    assert v4["claims_found"] == 2, v4
+    v5 = verify.verify_claims("The market cap of 416.2B dwarfs free cash flow.", {})
+    assert v5["claims_found"] == 1, v5
+    v6 = verify.verify_claims("The margin may reach 5% next year.", {})
+    assert v6["claims_found"] == 1, v6
+
+
+def test_a_slash_pair_names_both_operands():
+    """The RELIANCE.NS bear wrote "FCF/NI is only 0.86x". Both metrics are named, so
+    the derivation is grounded, and 0.86 is the ratio 0.855 within tolerance."""
+    pillars = {"fundamentals": {"fcf": 68.4, "net_income": 80.0}}
+    v = verify.verify_claims("FCF/NI is only 0.86x, so earnings are not cash-backed.", pillars)
+    assert v["unverified"] == 0, v
+    assert v["derived_from_evidence"] == 1, v
+
+
+def test_news_count_survives_the_verify_extras_merge():
+    """The bundle carries a headline count, not the list. Recomputing the count from
+    the missing list wrote zero and left a sentiment agent citing 10 ungrounded."""
+    bundle = {"extras": {"news_count": 10, "news_headlines": ["a headline"]},
+              "pillar_coverage": {"governance": 0.375}, "context": {"market_cap": 1.0}}
+    extras = analyze._verify_extras(bundle)
+    assert extras["news_count"] == 10, extras
+    v = verify.verify_claims("News flow is 10 items flagged.", {}, extras=extras)
+    assert v["unverified"] == 0, v
+    raw = analyze._verify_extras({"extras": {"news": [{}, {}, {}]}})
+    assert raw["news_count"] == 3, raw
+
+
+def test_a_ratio_is_read_as_a_share_or_a_percentage():
+    """'85.5% of net income' is the ratio 0.855 written the other way round, and the
+    pair can be stored in either order."""
+    pillars = {"fundamentals": {"net_income": 80.0, "fcf": 68.4}}
+    v = verify.verify_claims("Free cash flow is 85.5% of net income.", pillars)
+    assert v["unverified"] == 0, v
+    v2 = verify.verify_claims("Free cash flow is 0.86 of net income.", pillars)
+    assert v2["unverified"] == 0, v2
+
+
+def test_coverage_and_context_are_evidence_when_passed():
+    """The citation check allows pillar_coverage and context keys, so the verifier has
+    to accept them once analyze.py passes them through."""
+    extras = {"pillar_coverage": {"governance": 0.375}, "news_count": 10}
+    v = verify.verify_claims(
+        "Governance coverage is 37.5% and 10 news items returned no headline.",
+        PILLARS, extras=extras,
+    )
+    assert v["unverified"] == 0, v
+
+
+def test_short_text_needs_the_absolute_floor():
+    """17% unverified passes the ratio and still hides three invented numbers in an
+    18-number paragraph, so a short text fails on the count as well."""
+    pillars = {"fundamentals": {"net_margin_pct": 10.0}}
+    text = ("Net margin is 10.0%. " * 15) + "Gross margin was 71.2%, ROE 88.4% and PEG 44.7%."
+    v = verify.verify_claims(text, pillars)
+    assert (v["claims_found"], v["unverified"]) == (18, 3), v
+    assert v["verdict"] == "REVIEW", v
+
+
+def test_a_long_text_is_judged_by_the_ratio_only():
+    """The floor is for short texts. A 33-number run with three ungrounded numbers
+    keeps the ratio rule, or every long honest run would fail on the forecasts it is
+    allowed to make."""
+    pillars = {"fundamentals": {"net_margin_pct": 10.0}}
+    text = ("Net margin is 10.0%. " * 30) + "Gross margin was 71.2%, ROE 88.4% and PEG 44.7%."
+    v = verify.verify_claims(text, pillars)
+    assert (v["claims_found"], v["unverified"]) == (33, 3), v
+    assert v["verdict"] == "PASS", v
+
+
+def test_unverified_numbers_report_their_offsets():
+    """analyze.py blames an agent by offset, so the offsets must address the text it
+    was given."""
+    text = "Beta is 9.9 and 7.7."
+    v = verify.verify_claims(text, PILLARS)
+    assert v["unverified"] == 2, v
+    assert len(v["unverified_at"]) == 2, v
+    for at in v["unverified_at"]:
+        assert text[at].isdigit(), at
+
+
+def test_a_fully_invented_paragraph_is_reviewed():
+    """The headline failure, guarded. Every number here is invented and none is
+    evidence or honest arithmetic on evidence, so the run must not come out clean."""
+    text = (
+        "Revenue grew 14.7% while gross margin held at 42.4%, leaving free cash flow of "
+        "185.0bn against a market cap of 2.44trn. Shares trade at 30.86x book and 28.5x "
+        "forward earnings, with a dividend yield of 4.1%. Institutions hold 71.4% and "
+        "insiders 12.7%. The share count fell 7.3% over the year, beta reads 2.31, and the "
+        "deepest drawdown was -48.2%."
+    )
+    v = verify.verify_claims(text, PILLARS)
+    assert v["verdict"] == "REVIEW", v
+    assert v["grounding_rate"] < 0.8, v
 
 
 def test_citation_checker_rejects_invented_keys_under_allowed_prefixes():

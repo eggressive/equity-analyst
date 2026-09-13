@@ -30,6 +30,25 @@ import verify as verify_mod  # noqa: E402
 RUNS = Path(__file__).resolve().parent / "runs"
 
 
+def _attribute(offsets: list[int], segments: list[tuple[str, str]]) -> dict:
+    """Count ungrounded numbers per agent. The offsets address the joined text."""
+    spans, pos = [], 0
+    for name, text in segments:
+        spans.append((pos, pos + len(text), name))
+        pos += len(text) + 1
+    counts: dict[str, int] = {}
+    for at in offsets:
+        for lo, hi, name in spans:
+            if lo <= at <= hi:
+                counts[name] = counts.get(name, 0) + 1
+                break
+    return dict(sorted(counts.items(), key=lambda kv: -kv[1]))
+
+
+def _top_agent(counts: dict) -> str:
+    return next(iter(counts), "no agent")
+
+
 def build_bundle(symbol: str, with_extras: bool = True) -> dict:
     b = data_mod.load(symbol)
     pillars = metrics_mod.all_pillars(b)
@@ -76,6 +95,20 @@ def build_bundle(symbol: str, with_extras: bool = True) -> dict:
         },
         "warnings": b.warnings + extras.get("warnings", []),
     }
+
+
+def _verify_extras(bundle: dict) -> dict:
+    """Evidence the verifier needs beyond the metric pillars.
+
+    build_bundle has already counted the headlines and dropped the list, so the
+    count comes from the bundle. Recomputing it from a missing list wrote zero and
+    left a sentiment agent citing the real count ungrounded.
+    """
+    extras = dict(bundle.get("extras") or {})
+    extras["pillar_coverage"] = bundle.get("pillar_coverage") or {}
+    extras["context"] = bundle.get("context") or {}
+    extras.setdefault("news_count", len(extras.get("news") or []))
+    return extras
 
 
 def deterministic_report(bundle: dict) -> dict:
@@ -175,26 +208,44 @@ def run(symbol: str, model: str | None = None, no_llm: bool = False, quiet: bool
     result["debate"] = {k: v.as_dict() for k, v in debate.items()}
 
     # Verification: check every number any agent emitted against the evidence bundle.
-    all_text = " ".join(
-        json.dumps(r.data, default=str) for r in list(specialists.values()) + list(debate.values())
-    )
+    # The text is joined with known offsets so an ungrounded number can be blamed on
+    # the agent that wrote it.
+    segments = [
+        (name, json.dumps(res.data, default=str))
+        for name, res in list(specialists.items()) + list(debate.items())
+    ]
+    all_text = " ".join(text for _, text in segments)
     scores = [
         v for r in specialists.values()
         for v in (r.data.get("score"), r.data.get("confidence"))
         if isinstance(v, (int, float))
     ]
+    # Coverage fractions and the price context are cited by agents and allowed by
+    # the citation check, so the verifier has to accept them as evidence too.
+    extras = _verify_extras(bundle)
     v = verify_mod.verify_claims(
-        all_text, bundle["pillars"], declared_scores=scores, extras=bundle.get("extras"),
+        all_text, bundle["pillars"], declared_scores=scores, extras=extras,
     )
     v["agent_violations"] = {
         n: r.violations for n, r in specialists.items() if r.violations
     }
     v["failed_agents"] = [n for n, r in specialists.items() if r.status != "ok"]
+    v["unverified_by_agent"] = _attribute(v.get("unverified_at") or [], segments)
     result["verification"] = v
+    if v["verdict"] != "PASS":
+        # Informational, never a score: the rubric verdict is computed before any
+        # agent runs and no verification result may move it.
+        result["warnings"] = list(result["warnings"]) + [
+            f"verification {v['verdict']}: {v['unverified']} of {v['claims_found']} "
+            f"numbers ungrounded, mostly from {_top_agent(v['unverified_by_agent'])}"
+        ]
 
     if not quiet:
         print(f"  verification: {v['verdict']} grounding={v['grounding_rate']} "
               f"({v['verified']}/{v['claims_found']} numbers matched)")
+        if v["verdict"] != "PASS":
+            print(f"  verification warning: {v['unverified']} ungrounded, "
+                  f"{_top_agent(v['unverified_by_agent'])}")
         if v["agent_violations"]:
             print(f"  citation violations: {list(v['agent_violations'])}")
         print("  judge synthesis...")
