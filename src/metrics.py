@@ -371,40 +371,63 @@ def _recorded_split_factors(splits, columns) -> list:
 def _step_matches_factor(step, factor) -> bool:
     """True when a step between two columns is the recorded corporate action.
 
-    A restated column carries the action plus that year's issuance, so the step sits at the
-    factor or up to SPLIT_MATCH_TOLERANCE above it (HDFCBANK: 2.155 = 2.0 x 1.078). A step
-    below the factor is not explained by it: only part of the count moved.
+    A restated column carries the action plus the movement of that period, in the direction
+    issuance moves the count, so the step sits at the factor or up to SPLIT_MATCH_TOLERANCE
+    above it whatever the direction of the action: HDFCBANK 2.155 = 2.0 x 1.078 for a bonus,
+    and 0.105 = 0.1 x 1.05 for a reverse split with issuance on top. A step below the factor
+    is not explained by it: only part of the count moved.
     """
-    carried = step / factor
-    if factor < 1:
-        return 1 - SPLIT_MATCH_TOLERANCE <= carried <= 1
-    return 1 <= carried <= 1 + SPLIT_MATCH_TOLERANCE
+    return 1 <= step / factor <= 1 + SPLIT_MATCH_TOLERANCE
 
 
 def _repair_share_steps(series, factors):
-    """Put the columns on one basis by dividing out the steps a split factor explains."""
+    """Put the columns on one basis by dividing out the steps a split factor explains.
+
+    A recorded corporate action happens once, so each factor repairs at most one step, and
+    the step it repairs is the matching interval that holds the factor date or, when none
+    does, the nearest matching interval. The nearest case is what a restated column looks
+    like: HDFCBANK.NS's 2025-08-26 bonus appears as a step one column earlier, from
+    2024-03-31 to 2025-03-31, because yfinance restates the newer column and not the older
+    one. Bounding the factor to one step matters: three doublings against a single recorded
+    2.0 would otherwise all be divided out and the dilution they represent would disappear.
+    """
     dates = [_naive_ts(i) for i in series.index]
     values = [float(v) for v in series.values]
     order = sorted(range(len(dates)), key=lambda i: dates[i])  # oldest first
-    scale = [1.0] * len(values)
-    repairs = 0
+    steps = []
     for k in range(1, len(order)):
         previous, current = order[k - 1], order[k]
-        if not values[previous]:
+        if values[previous]:
+            steps.append((k, dates[previous], dates[current], values[current] / values[previous]))
+
+    scale = [1.0] * len(values)
+    repairs = 0
+    for factor_date, factor in factors:
+        best = None
+        for k, start, end, step in steps:
+            if not _step_matches_factor(step, factor):
+                continue
+            if start < factor_date <= end:
+                distance = 0
+            else:
+                distance = min(abs((factor_date - end).days), abs((start - factor_date).days))
+            if best is None or distance < best[0]:
+                best = (distance, k)
+        if best is None:
             continue
-        step = values[current] / values[previous]
-        matched = [(abs(step / f - 1), f) for _, f in factors if _step_matches_factor(step, f)]
-        if not matched:
-            continue
-        factor = min(matched)[1]
-        for i in order[:k]:
+        for i in order[:best[1]]:
             scale[i] *= factor
         repairs += 1
     return pd.Series([v * s for v, s in zip(values, scale)], index=series.index), repairs
 
 
-def _implausible_share_steps(series) -> list:
-    """Steps that no single year of issuance explains, rounding included.
+def _implausible_share_steps(series):
+    """Steps that no single year of issuance explains, split into directions.
+
+    Returns (up, down), in which either list non-empty means the count moved further than
+    issuance can in one year. One direction alone can be real: two doublings in a row are
+    issuance. A step up and a step down in the same window cannot be one corporate action, so
+    that pair is what marks mixed bases.
 
     ROUNDING_ALLOWANCE is there because recorded ratios are rounded: HDB's ADS change reads
     0.502 on the share series, and 0.4% must not decide whether the columns mix bases.
@@ -414,15 +437,17 @@ def _implausible_share_steps(series) -> list:
     order = sorted(range(len(dates)), key=lambda i: dates[i])
     upper = MAX_PLAUSIBLE_SHARE_RATIO / (1 + ROUNDING_ALLOWANCE)
     lower = MIN_PLAUSIBLE_SHARE_RATIO * (1 + ROUNDING_ALLOWANCE)
-    out = []
+    up, down = [], []
     for k in range(1, len(order)):
         previous, current = order[k - 1], order[k]
         if not values[previous]:
             continue
         step = values[current] / values[previous]
-        if step >= upper or step <= lower:
-            out.append(round(step, 3))
-    return out
+        if step >= upper:
+            up.append(round(step, 3))
+        elif step <= lower:
+            down.append(round(step, 3))
+    return up, down
 
 
 def _share_trend_pct(series):
@@ -491,11 +516,11 @@ def governance(b) -> dict:
         if annual is not None:
             factors = _recorded_split_factors(getattr(b, "splits", None), annual.index)
             repaired, _ = _repair_share_steps(annual, factors)
-            implausible = _implausible_share_steps(repaired)
+            up, down = _implausible_share_steps(repaired)
             gap = _basis_disagreement_pct(annual, quarterly)
             mixed_bases = (
-                len(implausible) >= 2                    # two bases, not two corporate actions
-                or (len(implausible) == 1 and bool(factors))  # ambiguous beside a split
+                bool(up) and bool(down)          # two bases, not one corporate action
+                or (len(up) + len(down) == 1 and bool(factors))  # ambiguous beside a split
                 or (gap is not None and gap > BASIS_DISAGREEMENT_PCT)
             )
             series = quarterly if mixed_bases else repaired

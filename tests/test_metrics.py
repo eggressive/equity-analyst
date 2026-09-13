@@ -315,6 +315,40 @@ def test_annual_and_quarterly_disagreement_prefers_the_quarterly_series():
     assert gov["share_dilution_pct"] == 3.7
 
 
+ONE_SPLIT_THREE_DOUBLINGS = pd.DataFrame(
+    {"2025-03-31": [800.0], "2024-03-31": [400.0], "2023-03-31": [200.0],
+     "2022-03-31": [100.0]},
+    index=["Diluted Average Shares"],
+)
+LAST_INTERVAL_SPLIT = pd.Series([2.0], index=pd.to_datetime(["2025-01-15"]))
+
+
+def test_one_factor_repairs_one_step_only():
+    """Three doublings with a single recorded 2:1 split dated in the last interval. Matching
+    the factor against every step divides out all three and reports 0.0%, erasing two real
+    doublings. A corporate action happens once, so the factor repairs the one interval that
+    holds its date: the series reads +328.64% and the two doublings keep their -2."""
+    gov = metrics.governance(FakeBundle(ONE_SPLIT_THREE_DOUBLINGS, splits=LAST_INTERVAL_SPLIT))
+    assert gov["share_dilution_pct"] == 328.64
+    assert rubric.build_signals({"governance": gov})["governance"]["dilution"] == -2
+
+
+REVERSE_WITH_ISSUANCE = pd.DataFrame(
+    {"2025-03-31": [105000000.0], "2024-03-31": [1000000000.0]},
+    index=["Diluted Average Shares"],
+)
+REVERSE_FACTOR = pd.Series([0.1], index=pd.to_datetime(["2024-06-01"]))
+
+
+def test_reverse_split_with_issuance_is_repaired():
+    """A recorded 0.1 reverse split with issuance on top reads 0.105, which is the factor
+    times 1.05, and it must match on the same terms as a forward split: the step is the action
+    plus the movement of that period. Rejecting it would treat one step as mixed bases and drop
+    the metric to the quarterly series or to None."""
+    gov = metrics.governance(FakeBundle(REVERSE_WITH_ISSUANCE, splits=REVERSE_FACTOR))
+    assert gov["share_dilution_pct"] == 5.0
+
+
 def test_real_issuance_inside_the_band_keeps_its_number():
     """Realty Income issues equity repeatedly: +48.5% over the window is issuance, not
     an artefact, and must still be reported and scored."""

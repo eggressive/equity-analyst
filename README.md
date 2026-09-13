@@ -236,8 +236,9 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    ratios at or below 0.9 or at or above 1.5 count as factors: near-1 ratios are distributions
    and ADR-ratio changes (SPGI 1.057, HON 0.9535, UL 0.888) and cannot rebase a share count.
 
-   **A series that still mixes bases falls back to the restated quarterly columns.** Two
-   implausible steps mean two bases rather than two corporate actions: HDB (ADS listing,
+   **A series that still mixes bases falls back to the restated quarterly columns.** An
+   implausible step in each direction means two bases rather than two corporate actions: HDB
+   (ADS listing,
    3.709bn -> 1.862bn -> 4.738bn) and TRV (a 23.11bn column where the years either side are
    0.23bn). TRV reads -7.04% from its quarterly columns, a buyback that keeps its +2. HDB has
    only two quarterly columns, which is a comparison rather than a trend, so it is refused.
@@ -254,11 +255,18 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    -2, TSLA -1 to +1, XOM -1 to -2, HDFCBANK.NS refused to -2, HDB -2 to refused) and one
    verdict: HDB LONG_TERM NEUTRAL 0.313 to BULLISH 0.497, because a wrong -2 leaves the
    pillar. Governance coverage moves with the refusals: HDB 1.000 to 0.667, HDFCBANK.NS 0.667
-   to 1.000. **The published runs predate this change**: AAPL's value moves -8.09% to -8.03%,
-   the same band and score, and the README tables quote scores, so no table changes. Guarded
-   by `tests/test_metrics.py`, which covers the bonus repair, the quarterly fallback, the
-   refusal when neither series is usable, the trend reading against the endpoint reading, and
-   a rubric check that a refused value is unavailable rather than scored.
+   to 1.000. **The tracked runs predate this change, and none of their machine-readable content
+   does.** `runs/*.json` record the 2026-09-12 paid runs, and no signal or score in them moves,
+   because no band moves: AAPL keeps +2 while the value quoted in its prose drifts -8.09% to
+   -8.03% (11 mentions), and TCS keeps +1 while its prose drifts -1.12% to -1.24% (7 mentions).
+   Repairing that prose means paying for new runs. The deterministic half is free: on
+   2026-09-13 `python analyze.py <SYM> --no-llm` reproduced all three published rows from live
+   data into a timestamped artefact of its own, AAPL NEUTRAL 0.294 / BULLISH 0.458,
+   RELIANCE.NS BULLISH 0.5 / 0.734 and TCS.NS NEUTRAL 0.246 / BULLISH 0.796.
+   Guarded by `tests/test_metrics.py`, which covers the bonus repair, the quarterly fallback,
+   the refusal when neither series is usable, the trend reading against the endpoint reading,
+   one factor repairing one step, a reverse split with issuance, and a rubric check that a
+   refused value is unavailable rather than scored.
 
 **Fabrication is treated as worse than absence.** A failed agent returns
 `status="unavailable"` with an error string, never plausible-looking prose: a truncated

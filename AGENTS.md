@@ -46,6 +46,11 @@ intact in every change: the LLM layer interprets, the Python layer decides.
 6. **README numbers are read back from artefacts, not typed.** When you change
    scoring or metrics, rerun the affected tickers and update
    `runs/*.json` and the README tables from the actual output.
+   `python analyze.py <SYM> --no-llm` does the deterministic half for free and writes
+   its own timestamped artefact: use it to re-derive the published scores. The tracked
+   `runs/*.json` are dated records of a paid run, so their prose keeps the values of the
+   code that produced it. State the drift in the README; do not splice new numbers into
+   an old run.
 7. **No em dashes (U+2014) anywhere.** Code comments, README, docstrings, PR
    descriptions, commit messages. Use a colon, semicolon, parentheses or a
    new sentence.
