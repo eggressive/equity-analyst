@@ -130,6 +130,35 @@ def _result_from_dict(d: dict):
     )
 
 
+def _check_resume(prev: dict, symbol: str, model: str, resume: str) -> list[str]:
+    """Guard the --resume file before any of it is reused.
+
+    Reuse is keyed by agent name and `status == "ok"` alone, so a file written for
+    another ticker would inject that company's prose into this bundle without a
+    complaint: the artefact would carry this symbol and the other company's analysis,
+    and the verifier would only show it as a grounding collapse. Measured on
+    2026-09-13: resuming TCS.NS from AAPL's artefact reused all nine AAPL summaries and
+    AAPL's bull thesis, made two model calls, and reported TCS.NS at grounding 0.432.
+
+    Returns warnings for a mismatch a run can survive, and refuses a symbol mismatch.
+    """
+    if not prev:
+        return [f"resume file not readable, running fresh: {resume}"] if resume else []
+    stored = prev.get("symbol")
+    if stored and stored != symbol:
+        raise SystemExit(
+            f"refusing --resume {resume}: it holds {stored}, this run is {symbol}. "
+            "Point --resume at this ticker's file, or drop the flag for a fresh run.")
+    notes = []
+    if not stored:
+        notes.append(f"resume file records no symbol, reuse is unverified: {resume}")
+    stored_model = prev.get("model")
+    if stored_model and stored_model != model:
+        notes.append(f"resumed stages came from {stored_model}, this run calls {model}; "
+                     "per-agent model fields in the artefact keep the provenance")
+    return notes
+
+
 def run(symbol: str, model: str | None = None, no_llm: bool = False, quiet: bool = False,
         resume: str | None = None) -> dict:
     t0 = time.time()
@@ -163,6 +192,11 @@ def run(symbol: str, model: str | None = None, no_llm: bool = False, quiet: bool
         return result
 
     prev = json.loads(Path(resume).read_text()) if resume and Path(resume).exists() else {}
+    resume_notes = _check_resume(prev, bundle["symbol"], model, resume or "")
+    result["warnings"] = list(result["warnings"]) + resume_notes
+    if resume_notes and not quiet:
+        for note in resume_notes:
+            print(f"  resume note: {note}")
 
     reused = {n: d for n, d in (prev.get("agents") or {}).items() if d.get("status") == "ok"}
     if reused:

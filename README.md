@@ -54,7 +54,10 @@ cp .env.example .env                 # optional, documents the overrides
 ```
 
 `--resume <run.json>` reuses the `ok` stages of an earlier run (`--out` writes the file
-to reuse). No resume fixture ships with this repository, so point it at your own.
+to reuse). No resume fixture ships with this repository, so point it at your own. The file
+must belong to the same ticker: reuse is keyed by stage name, so a mismatch would import
+another company's analysis under this symbol. `analyze.py` refuses a symbol mismatch and
+notes a file that records another model, or no symbol at all.
 
 Env overrides: `EA_MODEL` (default `deepseek-v4.1-flash:cloud`),
 `EA_FALLBACK_MODEL` (default `glm-5.3:cloud`), `EA_BASE_URL`.
@@ -171,9 +174,10 @@ Honest gaps, in rough order of impact:
 
 ## Known failure modes, already handled
 
-Eleven bugs shipped and were fixed during construction. Bugs 1-5, 9, 10 and 11 are Python
-errors in the metric, verification and protocol layers; 6 and 7 are LLM-protocol errors; 8
-is an HTTP 403 from SEC EDGAR. `tests/` guards bugs 1-5 and 9 to 11. Bugs 6, 7 and 8 have
+Twelve bugs shipped and were fixed during construction. Bugs 1-5, 9, 10, 11 and 12 are
+Python errors in the metric, verification, protocol and orchestration layers; 6 and 7 are
+LLM-protocol errors; 8 is an HTTP 403 from SEC EDGAR. `tests/` guards bugs 1-5 and 9 to
+12. Bugs 6, 7 and 8 have
 no test and are recorded here only, which is a real gap in the suite rather than a claim of
 coverage.
 
@@ -340,6 +344,18 @@ coverage.
     the caps are applied, a word overrun survives untouched, exactly one corrective
     re-call happens and the cleaner attempt wins, an invented or absent debate key path
     is caught, and a restored result is re-audited.
+
+12. **`--resume` had no ticker guard.** Reuse is keyed by stage name and `status == "ok"`,
+    so pointing a run at another ticker's artefact imported that company's analysis under
+    this symbol. Measured 2026-09-13: `analyze.py TCS.NS --resume runs/AAPL_final.json`
+    reused all nine AAPL summaries and AAPL's bull case, made only the two remaining calls
+    (bear and judge), and wrote a TCS.NS artefact at grounding 0.432 with a REVIEW warning
+    that blamed the bull rather than the file.
+
+    **Fixed 2026-09-13.** The resume file is refused when its `symbol` differs, and noted
+    when it records another model or no symbol at all, because the artefact's top level
+    `model` names the run being made, not the stages being reused. Guarded by
+    `test_resume_refuses_another_tickers_file`.
 
 **Fabrication is treated as worse than absence.** A failed agent returns
 `status="unavailable"` with an error string, never plausible-looking prose: a truncated
