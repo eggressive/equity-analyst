@@ -26,6 +26,7 @@ the LLM layer generates interpretation, the Python layer generates the decision.
 | `analyze.py` | Orchestration, run artefacts, resume. | No |
 | `tests/test_rubric.py` | Determinism, sign-direction, citation and verifier invariants. | No |
 | `tests/test_metrics.py` | Statement-row matching: the silently-wrong-number class of bug. | No |
+| `tests/test_docs.py` | Document rules: one changelog, resolvable links, no em dash. No third-party imports. | No |
 
 ## Install
 
@@ -51,6 +52,7 @@ cp .env.example .env                 # optional, documents the overrides
 .venv/bin/python analyze.py AAPL --no-llm   # deterministic only, zero API cost
 .venv/bin/python tests/test_rubric.py
 .venv/bin/python tests/test_metrics.py
+.venv/bin/python tests/test_docs.py
 ```
 
 `--resume <run.json>` reuses the `ok` stages of an earlier run (`--out` writes the file
