@@ -1,6 +1,6 @@
 # TODO
 
-Open findings from the 2026-09-13 codebase validation. No fixes below are implemented.
+Open findings from the 2026-09-13 codebase validation. Resolved portions are noted below.
 Completed changes belong in [CHANGELOG.md](CHANGELOG.md).
 
 ## Validation baseline
@@ -13,7 +13,7 @@ Completed changes belong in [CHANGELOG.md](CHANGELOG.md).
 ## High priority
 
 - [ ] **T01: Refuse misleading ratios with negative denominators.** In `src/metrics.py`, negative equity and net income can turn distress into bullish signals. A fixture with debt 100, equity -10, net income -20 and operating cash flow -40 produced leverage +2, ROE +2 and cash conversion +1. Decide the valid denominator policy before implementation. Test that invalid ratios become unavailable and dilute coverage without changing rubric thresholds.
-- [ ] **T02: Bind resumed analysis to its evidence.** `analyze.py` fetches fresh evidence before reusing saved prose, without checking the saved ticker or evidence identity. Missing specialists remain unavailable instead of being retried. Persist the evidence bundle and fingerprint, reject mismatched tickers, and define whether resume restores the original snapshot or reruns stages against fresh evidence. Test mismatched tickers, changed evidence and partial failures.
+- [ ] **T02: Bind resumed analysis to its evidence.** `analyze.py` fetches fresh evidence before reusing saved prose without checking evidence identity. Cross-ticker reuse was fixed in commit `1f5e1f9` (PR #13); missing symbols still produce a warning. Missing specialists remain unavailable instead of being retried. Persist the evidence bundle and fingerprint, and define whether resume restores the original snapshot or reruns stages against fresh evidence. Test changed evidence, missing identity and partial failures; retain the existing cross-ticker regression test.
 - [ ] **T03: Prevent repeated split repair of one step.** `_repair_share_steps` in `src/metrics.py` can assign multiple recorded factors to the same unchanged step. A synthetic annual series `[100, 200, 200]` with two recorded 2:1 factors became `[400, 200, 200]`. Track consumed steps or explicitly reconcile compound actions. Decide how ambiguous multiple-factor matches should fall back or be refused. Test separate splits and multiple actions within one statement interval.
 
 ## Medium priority

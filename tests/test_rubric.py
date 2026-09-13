@@ -514,6 +514,26 @@ def test_one_corrective_recall_and_the_cleaner_attempt_wins():
     assert res.violations, res.violations
 
 
+def test_resume_refuses_another_tickers_file():
+    """Reuse is keyed by stage name and status only, so a resume file from another ticker
+    imports that company's analysis under this symbol. Measured on 2026-09-13: TCS.NS
+    resumed from AAPL's artefact reused all nine AAPL summaries and AAPL's bull case."""
+    aapl = {"symbol": "AAPL", "model": "m1"}
+    assert analyze._check_resume(aapl, "AAPL", "m1", "runs/AAPL_final.json") == []
+    notes = analyze._check_resume(aapl, "AAPL", "m2", "runs/AAPL_final.json")
+    assert notes and "m1" in notes[0] and "m2" in notes[0], notes
+    notes = analyze._check_resume({}, "AAPL", "m1", "typo.json")
+    assert notes and "not readable" in notes[0], notes
+    notes = analyze._check_resume({"agents": {}}, "AAPL", "m1", "old.json")
+    assert notes and "no symbol" in notes[0], notes
+    try:
+        analyze._check_resume(aapl, "TCS.NS", "m1", "runs/AAPL_final.json")
+    except SystemExit as exc:
+        assert "AAPL" in str(exc) and "TCS.NS" in str(exc), exc
+    else:
+        raise AssertionError("a resume file for another ticker must refuse")
+
+
 def test_news_count_survives_the_verify_extras_merge():
     """The bundle carries a headline count, not the list. Recomputing the count from
     the missing list wrote zero and left a sentiment agent citing 10 ungrounded."""
