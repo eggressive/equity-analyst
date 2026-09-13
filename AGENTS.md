@@ -54,7 +54,9 @@ intact in every change: the LLM layer interprets, the Python layer decides.
    spliced record claims the agents said something they did not.
 7. **No em dashes (U+2014) anywhere.** Code comments, README, docstrings, PR
    descriptions, commit messages. Use a colon, semicolon, parentheses or a
-   new sentence.
+   new sentence. This covers agent prose in `runs/*.json` too: the model is asked not to
+   emit the character, and `strip_em_dashes` in `src/agents.py` rewrites it to a comma on
+   the way in, so a run cannot ship one.
 
 ## Working conventions
 

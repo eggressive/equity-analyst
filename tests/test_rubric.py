@@ -300,6 +300,47 @@ def test_citation_checker_rejects_bare_nested_leaf_names():
         assert not agents._check_citations({"cited_metrics": [real]}, bundle), real
 
 
+def test_agent_prose_carries_no_em_dash():
+    """AGENTS.md rule 7 bans U+2014, and the pipeline rewrites it on the way in."""
+    dash = "\u2014"
+    nested = {
+        "summary": f"Revenue grew 6.43% {dash} solid but mid-single-digit.",
+        "key_points": [f"Premium valuation{dash}38.15x earnings{dash}needs proof.", "clean"],
+        "score": 1.0,
+    }
+    out = agents.strip_em_dashes(nested)
+    assert out["summary"] == "Revenue grew 6.43%, solid but mid-single-digit."
+    assert out["key_points"][0] == "Premium valuation, 38.15x earnings, needs proof."
+    assert out["key_points"][1] == "clean" and out["score"] == 1.0
+    assert dash not in str(out)
+    # The prompt asks for the same thing, because a rewrite is a fallback, not a plan.
+    for prompt in (agents.AGENT_SYSTEM, agents.BULL_SYSTEM, agents.BEAR_SYSTEM, agents.JUDGE_SYSTEM):
+        assert "em dash" in prompt
+
+
+def test_tracked_runs_carry_no_em_dash():
+    """The shipped artefacts obey rule 7 too, in every string they hold."""
+    import json
+
+    def strings(obj):
+        if isinstance(obj, str):
+            yield obj
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                yield from strings(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                yield from strings(v)
+
+    runs = Path(__file__).resolve().parent.parent / "runs"
+    files = sorted(runs.glob("*.json"))
+    assert files, f"no tracked artefacts under {runs}"
+    for path in files:
+        text = path.read_text()
+        assert "\u2014" not in text, f"escaped em dash in {path.name}"
+        assert not any("\u2014" in s for s in strings(json.loads(text))), path.name
+
+
 if __name__ == "__main__":
     import traceback
 

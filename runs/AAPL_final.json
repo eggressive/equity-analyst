@@ -225,8 +225,8 @@
         "confidence": 0.7,
         "summary": "Revenue of $416.2B grew 6.43% YoY with 46.91% gross and 31.97% operating margins. FCF of $98.8B (23.73% margin) and cash conversion of 1.0 show clean earnings-to-cash translation. ROE of 151.91% is leverage- and buyback-assisted; debt-to-equity of 1.34 and cash at 10% of assets temper balance-sheet strength.",
         "key_points": [
-          "Revenue $416.2B, up 6.43% YoY \u2014 solid but mid-single-digit growth.",
-          "Gross margin 46.91%, operating 31.97%, net 26.92% \u2014 high and consistent profitability.",
+          "Revenue $416.2B, up 6.43% YoY, solid but mid-single-digit growth.",
+          "Gross margin 46.91%, operating 31.97%, net 26.92%, high and consistent profitability.",
           "FCF $98.8B at 23.73% margin; OCF/NI of 1.0 confirms full cash conversion.",
           "Debt-to-equity 1.34 with cash only 10% of assets; ROE 151.91% is leverage-inflated.",
           "ROA 31.18% indicates efficient asset base despite thin cash buffer."
@@ -325,7 +325,7 @@
         "agent": "sentiment",
         "score": -0.5,
         "confidence": 0.3,
-        "summary": "News flow is unusable: 10 items counted but every headline is null and publishers empty, so no catalyst can be read. Price sits 2.21% below the 52-week high with RSI at 70.62 and 16.77% above the 200-day average, while volume runs 21.86% below its 20-day average \u2014 an extended, thinly-traded advance that likely already discounts good news.",
+        "summary": "News flow is unusable: 10 items counted but every headline is null and publishers empty, so no catalyst can be read. Price sits 2.21% below the 52-week high with RSI at 70.62 and 16.77% above the 200-day average, while volume runs 21.86% below its 20-day average, an extended, thinly-traded advance that likely already discounts good news.",
         "key_points": [
           "All 10 news headlines are null and publishers empty; no sentiment signal can be extracted.",
           "RSI14 at 70.62 and price 2.21% from the 52-week high indicate an extended tape.",
@@ -642,7 +642,7 @@
     "agent": "judge",
     "status": "ok",
     "data": {
-      "explanation": "The deterministic rubric is final: SHORT_TERM is NEUTRAL at 0.294 and LONG_TERM is BULLISH at 0.458. Short-term neutrality comes from the 35% technical weight scoring 0.0\u2014price is above the 50-day (317.83) and 200-day (284.54) averages, but RSI 70.62 and price only 2.21% below the 52-week high offset the trend\u2014while valuation at -0.8 drags on elevated P/E 38.15, P/B 45.15, EV/EBITDA 29.0 and PEG 2.61. Fundamentals (1.143), risk (0.667) and governance (1.0) provide support, but not enough to overcome the short-term technical/valuation mix. Long-term bullishness is driven by fundamentals (32% weight, 1.143) and governance (20%, 1.0): revenue grew 6.43% YoY, gross and operating margins are 46.91% and 31.97%, FCF margin is 23.73%, ROE is 151.91%, and net share count fell 8.03% via buybacks. Valuation remains a drag (-0.8) and technicals are de-emphasized at 7%, so the bear's overbought/thin-volume, ~2% FCF yield, and buyback/leverage concerns are real but do not overturn the rubric's long-term bullish verdict. Verification passed with a 0.97 grounding rate, so the evidence base is reliable even though several macro, sentiment, events and peer-benchmark inputs are missing.",
+      "explanation": "The deterministic rubric is final: SHORT_TERM is NEUTRAL at 0.294 and LONG_TERM is BULLISH at 0.458. Short-term neutrality comes from the 35% technical weight scoring 0.0, price is above the 50-day (317.83) and 200-day (284.54) averages, but RSI 70.62 and price only 2.21% below the 52-week high offset the trend, while valuation at -0.8 drags on elevated P/E 38.15, P/B 45.15, EV/EBITDA 29.0 and PEG 2.61. Fundamentals (1.143), risk (0.667) and governance (1.0) provide support, but not enough to overcome the short-term technical/valuation mix. Long-term bullishness is driven by fundamentals (32% weight, 1.143) and governance (20%, 1.0): revenue grew 6.43% YoY, gross and operating margins are 46.91% and 31.97%, FCF margin is 23.73%, ROE is 151.91%, and net share count fell 8.03% via buybacks. Valuation remains a drag (-0.8) and technicals are de-emphasized at 7%, so the bear's overbought/thin-volume, ~2% FCF yield, and buyback/leverage concerns are real but do not overturn the rubric's long-term bullish verdict. Verification passed with a 0.97 grounding rate, so the evidence base is reliable even though several macro, sentiment, events and peer-benchmark inputs are missing.",
       "bull_case_held": [
         "Gross margin 46.91% and operating margin 31.97% support durable profitability and pricing power, as reflected in the fundamentals pillar score of 1.143.",
         "Free cash flow of $98.8B at a 23.73% FCF margin confirms strong cash generation, even though the cash-conversion signal itself is neutral.",
@@ -663,7 +663,7 @@
         "What catalysts are hidden by the empty news and events feeds, given the only dated event is earnings on 2026-10-29 with no consensus or guidance?",
         "Is the 8.03% net share reduction sustainable without further leverage, and what does the thin leverage/dilution coverage omit?"
       ],
-      "biggest_uncertainty": "Whether Apple's premium valuation\u201438.15x TTM earnings, 45.15x book, and PEG 2.61\u2014can be justified by durable mid-single-digit growth and elite margins, especially without peer, consensus, or historical multiple benchmarks."
+      "biggest_uncertainty": "Whether Apple's premium valuation, 38.15x TTM earnings, 45.15x book, and PEG 2.61, can be justified by durable mid-single-digit growth and elite margins, especially without peer, consensus, or historical multiple benchmarks."
     },
     "model": "deepseek-v4.1-flash:cloud",
     "tokens": 7376,

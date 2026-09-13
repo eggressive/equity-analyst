@@ -48,6 +48,8 @@ Hard rules:
    this bundle; do not reason as if they do.
 5. Do not give a buy or sell verdict. Score only your own remit on a -2..+2 scale.
 6. Be concise and specific. No filler, no disclaimers.
+7. Never use an em dash (U+2014). Use a comma, colon, semicolon, parentheses or a new
+   sentence; the pipeline rewrites the dash to a comma if one slips through.
 
 Output limits are hard requirements. "summary" at most 60 words, at most 5 key_points
 at most 25 words each, at most 5 cited_metrics, at most 4 evidence_gaps. Do not restate
@@ -66,6 +68,7 @@ Return ONLY valid JSON:
 
 BULL_SYSTEM = """You are the BULL analyst. You must build the strongest honest bull case for this stock.
 Use ONLY the evidence bundle. The bear agent will attack your case, so do not overstate.
+Never use an em dash (U+2014); use a comma, colon, semicolon, parentheses or a new sentence.
 
 Output limits are hard requirements. Give at most 5 arguments. Each "claim" must be at
 most 40 words. Keep "thesis" to at most 80 words and list at most 4 break conditions.
@@ -83,6 +86,7 @@ Return ONLY valid JSON:
 BEAR_SYSTEM = """You are the BEAR analyst. Your job is to break the bull case, not to be balanced.
 Attack the most load-bearing bull arguments, using ONLY the evidence bundle. If the bull
 cited a metric, check it. If the bull overstated, say which claim fails and why.
+Never use an em dash (U+2014); use a comma, colon, semicolon, parentheses or a new sentence.
 
 Output limits are hard requirements. You have a maximum of 6 attacks. Each attack's
 "counter" must be at most 45 words. Keep "rebuttal" to at most 90 words and list at
@@ -100,6 +104,7 @@ Return ONLY valid JSON:
 JUDGE_SYSTEM = """You are the synthesis judge. You receive the 9 specialist outputs, the bull case,
 the bear's rebuttal, a mechanical verification report, and the deterministic rubric result.
 The rubric already decided the verdict. You do not change it.
+Never use an em dash (U+2014); use a comma, colon, semicolon, parentheses or a new sentence.
 Your job is to explain the verdict in one paragraph and to list the top open questions.
 
 Return ONLY valid JSON:
@@ -160,6 +165,26 @@ def _extract_json(text: str) -> dict | None:
         return json.loads(text[start : end + 1])
     except json.JSONDecodeError:
         return None
+
+
+# AGENTS.md rule 7 bans U+2014 anywhere, and agent prose is written by a model that
+# emits it whatever the prompt says. The dash is rewritten on the way in rather than
+# left to the prompt, because a rule the pipeline depends on has to hold in Python.
+# A comma reads correctly in both forms the models emit: the spaced one ("growth is
+# slow, margins are not") and the unspaced one used as a parenthetical pair
+# ("valuation, 38.15x book, can be justified").
+EM_DASH_RE = re.compile(r"\s*\u2014\s*")
+
+
+def strip_em_dashes(value):
+    """Replace every em dash with a comma in model-produced text, recursively."""
+    if isinstance(value, str):
+        return EM_DASH_RE.sub(", ", value)
+    if isinstance(value, dict):
+        return {k: strip_em_dashes(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [strip_em_dashes(v) for v in value]
+    return value
 
 
 # The five pillars the bundle always reports coverage for. Citing one of these is
@@ -309,6 +334,7 @@ def call_agent(name: str, system: str, payload: dict, model: str = DEFAULT_MODEL
             if data is None:
                 last_err = f"unparseable JSON on attempt {attempt + 1} (finish={choice.finish_reason})"
                 continue
+            data = strip_em_dashes(data)
             return AgentResult(
                 name=name, status="ok", data=data, raw=raw, model=model, tokens=tokens,
                 violations=_check_citations(data, payload),

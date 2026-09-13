@@ -326,7 +326,7 @@
         "agent": "sentiment",
         "score": -1.0,
         "confidence": 0.2,
-        "summary": "News flow is unusable: 10 items but all headlines null and no publishers, so nothing can be assessed as priced in. Price-based sentiment proxies are weak \u2014 31.32% below the 52-week high, below both moving averages, RSI 39.82, volume 34.92% under the 20-day average. Score reflects absent news evidence, not a directional call.",
+        "summary": "News flow is unusable: 10 items but all headlines null and no publishers, so nothing can be assessed as priced in. Price-based sentiment proxies are weak, 31.32% below the 52-week high, below both moving averages, RSI 39.82, volume 34.92% under the 20-day average. Score reflects absent news evidence, not a directional call.",
         "key_points": [
           "All 10 news items have null headlines and no publishers; no news sentiment can be scored.",
           "Price sits 31.32% below the 52-week high and below both the 50- and 200-day averages.",
@@ -396,9 +396,9 @@
         "confidence": 0.25,
         "summary": "Institutional ownership is a single current snapshot: 17.6% institutions against 71.79% insiders, implying a thin free float. Share count is shrinking (-1.24% dilution), a mildly supportive flow signal. No holder-level or historical positioning data exists in this bundle, so no change over time can be assessed.",
         "key_points": [
-          "Institutions hold 17.6%, insiders 71.79% \u2014 promoter-dominated register with limited institutional float.",
+          "Institutions hold 17.6%, insiders 71.79%, promoter-dominated register with limited institutional float.",
           "Share dilution of -1.24% indicates net share count reduction, a modestly supportive capital-return flow.",
-          "No holder list, no FII/DII split, no holdings history \u2014 positioning changes cannot be measured.",
+          "No holder list, no FII/DII split, no holdings history, positioning changes cannot be measured.",
           "Short interest unavailable (short_ratio null), so crowding and short positioning are unassessable."
         ],
         "cited_metrics": [
@@ -408,7 +408,7 @@
           "risk.short_ratio"
         ],
         "evidence_gaps": [
-          "data_quality.no_time_series_for lists holdings and institutional positioning changes \u2014 no trend computable.",
+          "data_quality.no_time_series_for lists holdings and institutional positioning changes, no trend computable.",
           "extras.institutional_holders is empty: no named holders, position sizes, or quarter-over-quarter deltas.",
           "No FII/DII or mutual-fund breakdown, no free float or market cap for ownership context.",
           "short_ratio is null; no short interest, borrow, or securities-lending data."
@@ -644,7 +644,7 @@
     "agent": "judge",
     "status": "ok",
     "data": {
-      "explanation": "The rubric's split verdict reflects a genuine quality-versus-momentum tension that both debaters surfaced with grounded evidence. SHORT_TERM lands NEUTRAL (0.246) because that horizon weights technicals at 0.35 and risk at 0.30, and the evidence there is unambiguous: the close of 2200.8 sits below both the SMA50 (2286.75) and SMA200 (2530.74), 13.04% under the 200-day and 31.32% off the 52-week high, on volume 34.92% below its 20-day average, with a -53.07% max drawdown in the history \u2014 the -0.75 technicals score largely cancels the +1.143 fundamentals and +1.0 valuation scores. LONG_TERM turns BULLISH (0.796) because fundamentals (0.32) and valuation (0.26) dominate there, and TCS's 25.1% operating margin, 18.43% net margin, 45.89% ROE, 1.06 cash conversion, 0.11 debt/equity, and 16x trailing PE at 10.6x EV/EBITDA with a 2.95% yield are objectively strong; the bear's best attack \u2014 PEG 2.88 against 4.58% revenue growth showing the multiple is not growth-supported \u2014 dents the re-rating thesis but cannot overturn the quality and balance-sheet evidence the long-horizon rubric rewards. Verification passed at 97.1% grounding with zero unverified claims, so the verdict rests on solid data even though sentiment, events, flows, and macro pillars carried almost no usable evidence (all 10 news headlines null, no index/rates/FX series) \u2014 and those pillars are excluded from the rubric weights anyway, so their emptiness lowers context confidence without changing the deterministic outcome.",
+      "explanation": "The rubric's split verdict reflects a genuine quality-versus-momentum tension that both debaters surfaced with grounded evidence. SHORT_TERM lands NEUTRAL (0.246) because that horizon weights technicals at 0.35 and risk at 0.30, and the evidence there is unambiguous: the close of 2200.8 sits below both the SMA50 (2286.75) and SMA200 (2530.74), 13.04% under the 200-day and 31.32% off the 52-week high, on volume 34.92% below its 20-day average, with a -53.07% max drawdown in the history, the -0.75 technicals score largely cancels the +1.143 fundamentals and +1.0 valuation scores. LONG_TERM turns BULLISH (0.796) because fundamentals (0.32) and valuation (0.26) dominate there, and TCS's 25.1% operating margin, 18.43% net margin, 45.89% ROE, 1.06 cash conversion, 0.11 debt/equity, and 16x trailing PE at 10.6x EV/EBITDA with a 2.95% yield are objectively strong; the bear's best attack, PEG 2.88 against 4.58% revenue growth showing the multiple is not growth-supported, dents the re-rating thesis but cannot overturn the quality and balance-sheet evidence the long-horizon rubric rewards. Verification passed at 97.1% grounding with zero unverified claims, so the verdict rests on solid data even though sentiment, events, flows, and macro pillars carried almost no usable evidence (all 10 news headlines null, no index/rates/FX series), and those pillars are excluded from the rubric weights anyway, so their emptiness lowers context confidence without changing the deterministic outcome.",
       "bull_case_held": [
         "Balance-sheet strength: debt/equity of 0.11 with 45.89% ROE gives real capacity to sustain dividends and buybacks through a weak demand cycle.",
         "Earnings quality in absolute terms: 25.1% operating margin, 18.43% net margin, and 17.96% FCF margin are high regardless of peer context.",
@@ -662,12 +662,12 @@
         "What is the dividend payout ratio and buyback pace required to sustain the 2.95% yield?",
         "What peer or industry margin benchmarks would confirm or refute the claimed pricing power?",
         "What is the source and revision trend behind the forward PE 13.54 estimate?",
-        "What catalyst could reverse the technical downtrend \u2014 price reclaiming the SMA50/SMA200 or volume normalizing from -34.92%?",
+        "What catalyst could reverse the technical downtrend, price reclaiming the SMA50/SMA200 or volume normalizing from -34.92%?",
         "What does the 2026-10-08 earnings report reveal about demand trajectory and margin guidance?",
         "What is actually priced in, given that all 10 news headlines were null and sentiment could not be assessed?",
-        "How does the missing macro backdrop \u2014 global IT-services demand, USD/INR, and rates \u2014 affect the growth outlook?"
+        "How does the missing macro backdrop, global IT-services demand, USD/INR, and rates, affect the growth outlook?"
       ],
-      "biggest_uncertainty": "Whether revenue growth re-accelerates from 4.58% \u2014 with PEG at 2.88, the long-term bullish verdict hinges on growth that the bundle's absent consensus, peer, and macro data can neither confirm nor refute."
+      "biggest_uncertainty": "Whether revenue growth re-accelerates from 4.58%, with PEG at 2.88, the long-term bullish verdict hinges on growth that the bundle's absent consensus, peer, and macro data can neither confirm nor refute."
     },
     "model": "glm-5.3:cloud",
     "tokens": 7302,

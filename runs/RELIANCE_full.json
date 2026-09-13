@@ -327,7 +327,7 @@
         "agent": "sentiment",
         "score": -0.5,
         "confidence": 0.2,
-        "summary": "News flow is unusable: extras.news_count is 10 but every headline is null and publishers empty, so no sentiment can be read from it. Only price-derived proxies exist \u2014 last close sits at the 52-week low, 20.66% below the high, with RSI14 at 36.05. Score is weakly negative on thin evidence.",
+        "summary": "News flow is unusable: extras.news_count is 10 but every headline is null and publishers empty, so no sentiment can be read from it. Only price-derived proxies exist, last close sits at the 52-week low, 20.66% below the high, with RSI14 at 36.05. Score is weakly negative on thin evidence.",
         "key_points": [
           "All eight headline slots are null and publishers list is empty; news_count of 10 carries no readable content.",
           "Last close 1257.5 equals the 52-week low and is 20.66% below the 52-week high.",
@@ -343,7 +343,7 @@
           "valuation.pe_forward"
         ],
         "evidence_gaps": [
-          "No news headlines, publishers, or timestamps \u2014 news sentiment cannot be measured at all.",
+          "No news headlines, publishers, or timestamps, news sentiment cannot be measured at all.",
           "No analyst consensus, ratings, or target prices in the bundle.",
           "No institutional positioning history; holdings are a single current observation only.",
           "No peer or sector benchmarks to judge whether weakness is stock-specific or sector-wide."
