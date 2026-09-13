@@ -304,6 +304,38 @@ def test_coverage_and_context_are_evidence_when_passed():
     assert v["unverified"] == 0, v
 
 
+def test_short_text_needs_the_absolute_floor():
+    """17% unverified passes the ratio and still hides three invented numbers in an
+    18-number paragraph, so a short text fails on the count as well."""
+    pillars = {"fundamentals": {"net_margin_pct": 10.0}}
+    text = ("Net margin is 10.0%. " * 15) + "Gross margin was 71.2%, ROE 88.4% and PEG 44.7%."
+    v = verify.verify_claims(text, pillars)
+    assert (v["claims_found"], v["unverified"]) == (18, 3), v
+    assert v["verdict"] == "REVIEW", v
+
+
+def test_a_long_text_is_judged_by_the_ratio_only():
+    """The floor is for short texts. A 33-number run with three ungrounded numbers
+    keeps the ratio rule, or every long honest run would fail on the forecasts it is
+    allowed to make."""
+    pillars = {"fundamentals": {"net_margin_pct": 10.0}}
+    text = ("Net margin is 10.0%. " * 30) + "Gross margin was 71.2%, ROE 88.4% and PEG 44.7%."
+    v = verify.verify_claims(text, pillars)
+    assert (v["claims_found"], v["unverified"]) == (33, 3), v
+    assert v["verdict"] == "PASS", v
+
+
+def test_unverified_numbers_report_their_offsets():
+    """analyze.py blames an agent by offset, so the offsets must address the text it
+    was given."""
+    text = "Beta is 9.9 and 7.7."
+    v = verify.verify_claims(text, PILLARS)
+    assert v["unverified"] == 2, v
+    assert len(v["unverified_at"]) == 2, v
+    for at in v["unverified_at"]:
+        assert text[at].isdigit(), at
+
+
 def test_a_fully_invented_paragraph_is_reviewed():
     """The headline failure, guarded. Every number here is invented and none is
     evidence or honest arithmetic on evidence, so the run must not come out clean."""

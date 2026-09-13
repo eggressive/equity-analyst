@@ -16,7 +16,7 @@ Measured on an AAPL bundle of 66 metric values plus coverage, context and news c
 2026-09-13: the derived index holds 3,648 values, and random numbers in 0.05..100 land
 in it 98% of the time, because percentages are dense. What attribution buys is the
 paragraph. A fully invented 12-number paragraph returned PASS on 100% of draws under
-value-level matching and returns PASS on 6% of draws now. Read `unverified == 0` as
+value-level matching and returns PASS on 1.2% of draws now. Read `unverified == 0` as
 "nothing obviously invented", not as proof of grounding. Judge output is never passed
 through this module.
 """
@@ -44,6 +44,13 @@ LABEL_PHRASES = re.compile(
     r"|\b\d{4}-\d{2}-\d{2}\b",
     re.I,
 )
+
+# A run passes when at most this share of its numbers is ungrounded, and a short
+# text also fails on an absolute count so a few invented numbers cannot hide in a
+# small sample.
+PASS_UNVERIFIED_RATIO = 0.20
+SHORT_TEXT_CLAIMS = 20
+SHORT_TEXT_FLOOR = 2
 
 UNITS = {
     "%": 1.0, "x": 1.0, "": 1.0,
@@ -303,7 +310,8 @@ def verify_claims(text: str, pillars: dict, rel_tol: float = 0.02,
         if not unit and float(value).is_integer() and 1900 <= value <= 2100:
             continue
         kind, ref = match(value, unit, start)
-        row = {"value": value, "unit": unit, "matched_metric": ref, "match_type": kind}
+        row = {"value": value, "unit": unit, "matched_metric": ref, "match_type": kind,
+               "at": start}
         if kind == "evidence":
             verified.append(row)
         elif kind == "derived":
@@ -313,6 +321,12 @@ def verify_claims(text: str, pillars: dict, rel_tol: float = 0.02,
 
     total = len(verified) + len(derived_hits) + len(unverified)
     grounded = len(verified) + len(derived_hits)
+    # The ratio alone is too generous for a short text: 12 claims pass with two
+    # ungrounded numbers, which is 16% of a paragraph and none of its substance.
+    # Short texts need the absolute floor as well.
+    failed = total > 0 and len(unverified) / total > PASS_UNVERIFIED_RATIO
+    if total and total <= SHORT_TEXT_CLAIMS and len(unverified) >= SHORT_TEXT_FLOOR:
+        failed = True
     return {
         "claims_found": total,
         "verified": len(verified),
@@ -320,8 +334,6 @@ def verify_claims(text: str, pillars: dict, rel_tol: float = 0.02,
         "unverified": len(unverified),
         "grounding_rate": round(grounded / total, 3) if total else None,
         "unverified_details": unverified[:20],
-        "verdict": (
-            "PASS" if total and len(unverified) / total <= 0.20
-            else "REVIEW" if total else "NO_CLAIMS"
-        ),
+        "unverified_at": [row["at"] for row in unverified],
+        "verdict": "PASS" if total and not failed else "REVIEW" if total else "NO_CLAIMS",
     }
