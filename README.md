@@ -87,9 +87,9 @@ Two horizons with different weights:
 
 | Symbol | SHORT_TERM | LONG_TERM | Agents | Grounding | Unmatched | Time |
 |---|---|---|---|---|---|---|
-| AAPL | NEUTRAL +0.294 | BULLISH +0.458 | 9/9 | 0.970 | 0 | 130s |
-| RELIANCE.NS | BULLISH +0.500 | BULLISH +0.734 | 9/9 | 0.971 | 0 | 137s |
-| TCS.NS | NEUTRAL +0.246 | BULLISH +0.796 | 9/9 | 0.971 | 0 | 183s |
+| AAPL | NEUTRAL +0.294 | BULLISH +0.458 | 9/9 | 1.000 | 0 | 87s |
+| RELIANCE.NS | BULLISH +0.500 | BULLISH +0.734 | 9/9 | 1.000 | 0 | 112s |
+| TCS.NS | NEUTRAL +0.246 | BULLISH +0.796 | 9/9 | 1.000 | 0 | 66s |
 
 Artefacts: `runs/AAPL_final.json`, `runs/RELIANCE_full.json`, `runs/TCS_full.json`.
 Verdicts, scores, grounding rates, agent counts and run times are read back from those
@@ -102,18 +102,19 @@ reproducible from them.
 The Bear earned its place on AAPL. Its six attacks in `runs/AAPL_final.json` go after the
 bull's load-bearing claims: that 46.91% gross and 31.97% operating margins prove durable
 pricing power (no peer, industry or historical benchmark sits in the bundle, so they
-cannot); that FCF conversion confirms cash quality ($98.8B of FCF on a $4.85T market cap is
-about a 2% yield, and one annual OCF/NI of 1.0 is a single period, not a trend); that price
-above the 50-day and 200-day averages is an intact uptrend (RSI 70.62 is overbought on
-volume 21.86% below its 20-day average, and price sits 2.21% under the 52-week high); that
-the 8.03% net share reduction lifts per-share value (buybacks at 45.15x book and 38.15x
-earnings can destroy value, and D/E of 1.34 points to leverage rather than spare cash); that
-ROA 31.18% and 6.43% revenue growth carry the case (ROE 151.91% is leverage-inflated and PEG
-2.61 says the growth is already priced); and that trend plus quality justify holding through
-volatility (a -33.36% max drawdown and 21.43% downside deviation say the trend did not
-protect capital). The judge kept five of the bull's claims and marked three broken: the
-OCF/NI conversion claim, the hold-through-volatility claim, and the buyback value-creation
-argument.
+cannot); that FCF margin and a cash conversion of 1.0 fully back net income (no capex,
+working-capital or multi-year cash series is in the bundle, so durability is untestable);
+that the stacked trend is a buy signal (RSI 70.62 is overbought, volume runs 21.86% below
+its 20-day average, and price sits 16.77% above the 200-day average, an extended rather
+than a fresh entry); that the 8.03% share-count reduction is a persistent earnings tailwind
+(it is an annual statement figure, not a current pace, and at 38.15x earnings and 45.15x
+book a repurchase only adds per-share value if the price is not already paying for it); that
+institutions and low risk make ownership stable (holdings are a single snapshot with no
+history, and beta 1.08 is backward-looking); and that rich multiples are acceptable because
+cash generation carries the case (PEG 2.61 on 6.43% revenue growth says the multiple is not
+supported by growth, and 29.0x EV/EBITDA leaves no cushion). The judge kept five of the
+bull's claims and marked six broken, including the pricing-power claim, the FCF-durability
+claim and the buyback value-creation argument.
 
 The debate cannot move the verdict. The rubric is computed from the metric bundle before
 any agent runs, so the debate changes the narrative only. That is a property of the code,
@@ -121,14 +122,18 @@ not of these runs: no artefact stores a before/after verdict pair.
 
 **Unmatched numbers are zero across all three tickers**: every figure any agent wrote
 resolved either to an evidence value or to arithmetic over evidence values. Read that
-carefully, because the check is weaker than it sounds. Matching is value-level, not
-claim-level, and the derived index is generous: 66 AAPL evidence values generate ~6,400
-derived values, and that index accepts roughly 95% of random numbers in 0.05..100. So
-`unverified = 0` means "nothing obviously invented", not "every claim is grounded"; 17.8% of
-AAPL's 197 numbers matched only through the derived index. One accounting note: the verifier
-skips bare 4-digit years after fixing the denominator, so the AAPL/RELIANCE/TCS `claims_found`
-of 197/172/173 includes 6/5/5 numbers that are neither verified nor unverified. No run
-records a citation violation.
+carefully, because the guarantee is weaker than it sounds. Matching is value-level, not
+claim-level: a number counts when it equals an evidence value, or a derived value whose two
+metrics are named beside it. The index holds 3,648 derived values for the 71 values one run
+exposes, and random numbers between 0.05 and 100 still land in it 98% of the time because
+percentages are dense, so `unverified = 0` means "nothing obviously invented", not "every
+claim is grounded". Attribution is what protects a paragraph rather than a number: two
+thousand fully invented 12-number paragraphs, run against a live AAPL bundle on 2026-09-13,
+passed on 100% of draws before this change and on 1.2% of draws after it. Of the
+AAPL/RELIANCE/TCS `claims_found` of 168/183/178, the derived index carried 0, 8 and 4
+numbers, and nothing sat in neither column. REVIEW stays informational: it appends a warning
+and names the agent in `verification.unverified_by_agent`, and it never reaches the score.
+No run records a citation violation.
 
 
 
@@ -164,10 +169,10 @@ Honest gaps, in rough order of impact:
 
 ## Known failure modes, already handled
 
-Nine bugs shipped and were fixed during construction. Bugs 1-5 and 9 are Python errors in
-the metric and verification layers; 6 and 7 are LLM-protocol errors; 8 is an HTTP 403 from
-SEC EDGAR. `tests/` guards bugs 1-5 and 9. Bugs 6, 7 and 8 have no test and are recorded
-here only, which is a real gap in the suite rather than a claim of coverage.
+Ten bugs shipped and were fixed during construction. Bugs 1-5, 9 and 10 are Python errors
+in the metric and verification layers; 6 and 7 are LLM-protocol errors; 8 is an HTTP 403
+from SEC EDGAR. `tests/` guards bugs 1-5, 9 and 10. Bugs 6, 7 and 8 have no test and are
+recorded here only, which is a real gap in the suite rather than a claim of coverage.
 
 1. **Wrong statement row.** Substring matching let `Other Non Operating Income
    Expenses` satisfy the needle `"Operating Income"`, so Reliance's operating margin
@@ -264,11 +269,38 @@ here only, which is a real gap in the suite rather than a claim of coverage.
    and 48.0, which their prose described as data errors. Both went stale when the code changed.
    On 2026-09-13 all three tickers were re-run on the merged code with the same model, and the
    tracked artefacts are those runs: same rows, the deterministic block identical to the
-   2026-09-12 runs, grounding 0.970 to 0.971 and no unverified numbers.
+   2026-09-12 runs, grounding 1.000 across all three and no unverified numbers.
    Guarded by `tests/test_metrics.py`: the bonus repair, the quarterly fallback, the refusal
    when neither series is usable, the trend reading against the endpoint reading, one factor
    repairing one step, a reverse split with issuance, and a rubric check that a refused value
    is unavailable rather than scored.
+
+10. **Value-level matching passed invented text.** The verifier compared values, not claims:
+    a number counted if it equalled any evidence value or any ratio, difference or
+    percentage change between two of them. A 66-value AAPL bundle yielded **6,435** derived
+    values, 99.9% of random numbers between 0.05 and 100 matched, and 2,000 fully invented
+    12-number paragraphs returned `grounding_rate 1.0`, `unverified 0` and **PASS** on
+    **82.5%** of draws, and PASS on **100%**. Three further defects compounded it: `$416.2B`
+    parsed as **416** and `$4.85T` as **4** because B and T were not units, an ISO date
+    contributed its month and day as claims, and honest arithmetic was flagged instead,
+    including a signed metric quoted at its magnitude (shares fell 8.03% against -8.03), a
+    ratio written as a share (FCF is 85.7% of net income), and the coverage, context and
+    news-count values the citation check already allowed.
+
+    **Fixed 2026-09-13.** Derived values now come only from related metrics, same pillar or
+    a price and level metric, and only when one of the pair is named beside the number, so
+    the index holds **3,648** values. Extraction reads B, T, trn, tn and k, and masks dates
+    and window runs. A signed metric accepts the magnitude stated, and a ratio is read as a
+    share or a percentage in either pair order. Coverage, context and news count reach the
+    verifier. A text of 20 claims or fewer also fails on an absolute floor, PASS needing at
+    most one ungrounded number, and a REVIEW verdict appends a warning and names the agent
+    that wrote the ungrounded numbers. The same 2,000 invented paragraphs pass on **1.2%**
+    of draws, and the three tracked runs stay PASS with `unverified 0`.
+
+    Guarded by `tests/test_rubric.py`: a fully invented paragraph is REVIEW, `$416.2B` keeps
+    its magnitude, a date and a window run contribute no claims, a signed metric accepts its
+    magnitude, two unrelated metrics derive nothing, a ratio reads as a share in either
+    order, and the floor fires on a short text but not on a long one.
 
 **Fabrication is treated as worse than absence.** A failed agent returns
 `status="unavailable"` with an error string, never plausible-looking prose: a truncated

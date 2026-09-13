@@ -1,7 +1,7 @@
 {
   "symbol": "TCS.NS",
   "market": "NSE",
-  "generated_at": "2026-09-13T15:49:09Z",
+  "generated_at": "2026-09-13T19:11:19Z",
   "model": "deepseek-v4.1-flash:cloud",
   "context": {
     "last_price": 2200.800048828125,
@@ -10,7 +10,7 @@
     "industry": "Information Technology Services",
     "currency": "INR",
     "long_name": "Tata Consultancy Services Limited",
-    "as_of": "2026-09-13T15:49:09Z",
+    "as_of": "2026-09-13T19:11:19Z",
     "price_bars": 501
   },
   "warnings": [],
@@ -223,32 +223,32 @@
       "status": "ok",
       "data": {
         "agent": "fundamentals",
-        "score": 1.2,
-        "confidence": 0.7,
-        "summary": "Revenue grew 4.58% YoY to INR 2.67tn with 25.1% operating and 18.43% net margins. Cash conversion of 1.06 and 17.96% FCF margin show clean earnings quality. Debt/equity 0.11 and ROE 45.89% signal a strong balance sheet. Growth is the soft spot.",
+        "score": 1.0,
+        "confidence": 0.75,
+        "summary": "Revenue grew 4.58% yoy to INR 2.67tn with operating margin 25.1% and net margin 18.43%. FCF margin 17.96% and cash conversion 1.06 show strong cash generation. ROE 45.89% and debt-to-equity 0.11 indicate a strong balance sheet. Growth is the main soft spot.",
         "key_points": [
-          "Revenue growth 4.58% YoY is modest; no multi-year series available to judge trend.",
-          "Operating margin 25.1% and net margin 18.43% indicate solid profitability.",
-          "OCF/net income 1.06 and FCF margin 17.96% confirm strong cash conversion.",
-          "Debt/equity 0.11 with ROE 45.89% and ROA 26.98%: low leverage, high returns.",
-          "Cash to assets only 3.51%; net_debt_to_ebitda is null, limiting leverage detail."
+          "Revenue growth 4.58% yoy is modest for IT services.",
+          "Operating margin 25.1% and net margin 18.43% show strong profitability.",
+          "FCF margin 17.96% with cash conversion 1.06 signals high-quality earnings.",
+          "ROE 45.89% and debt-to-equity 0.11 reflect a strong balance sheet.",
+          "Cash to assets 3.51% is a single current observation, not a trend."
         ],
         "cited_metrics": [
           "pillars.fundamentals.revenue_growth_yoy_pct",
           "pillars.fundamentals.operating_margin_pct",
+          "pillars.fundamentals.fcf_margin_pct",
           "pillars.fundamentals.cash_conversion_ocf_over_ni",
-          "pillars.fundamentals.debt_to_equity",
-          "pillars.fundamentals.roe_pct"
+          "pillars.fundamentals.debt_to_equity"
         ],
         "evidence_gaps": [
-          "No multi-year revenue or margin history; growth and margin trend cannot be assessed.",
-          "net_debt_to_ebitda and net_debt_to_equity are null, so net leverage is unknown.",
-          "No peer benchmarks or industry averages for margin and growth comparison.",
-          "No segment, geographic, or order-book revenue breakdown."
+          "net_debt_to_ebitda is null, so leverage versus EBITDA cannot be assessed.",
+          "No peer benchmarks or industry averages exist in this bundle.",
+          "Margins and returns are single-year observations with no trend history.",
+          "No segment or geographic revenue breakdown is provided."
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 2864,
+      "tokens": 3080,
       "error": "",
       "violations": []
     },
@@ -257,32 +257,32 @@
       "status": "ok",
       "data": {
         "agent": "valuation",
-        "score": 0.5,
-        "confidence": 0.6,
-        "summary": "Multiples are mid-teens earnings, 10.6x EV/EBITDA, 7.26x book, with a 2.95% dividend yield. Forward PE below trailing implies expected earnings growth, yet PEG 2.88 against 4.58% revenue growth suggests the multiple is not growth-supported. Peer and historical multiple context is absent, so relative cheapness cannot be judged.",
+        "score": 0.0,
+        "confidence": 0.35,
+        "summary": "TCS trades at 16.0x TTM and 13.54x forward earnings with a 2.95% dividend yield and 10.6x EV/EBITDA. PEG of 2.88 and P/B of 7.26 look rich against 4.58% revenue growth. Price sits 31.32% below its 52-week high. No peer or historical multiple data exists to contextualise these levels.",
         "key_points": [
-          "PE 16.0 trailing versus 13.54 forward; forward discount implies expected EPS growth, unverifiable without consensus.",
-          "PEG 2.88 against 4.58% revenue growth indicates the multiple is not growth-supported.",
-          "EV/EBITDA 10.6, EV/revenue 2.77, PB 7.26, dividend yield 2.95%.",
-          "Price 2200.8 sits 31.32% below the 52w high and below both moving averages.",
-          "No peer or industry multiples in bundle, so peer-relative valuation cannot be assessed."
+          "P/E 16.0 TTM versus 13.54 forward implies expected earnings growth, but PEG 2.88 signals the multiple is high relative to growth.",
+          "P/B 7.26 is supported by 45.89% ROE, though no peer benchmark exists to judge the premium.",
+          "Dividend yield 2.95% and EV/EBITDA 10.6 offer some valuation support at the current price.",
+          "Price is 31.32% below the 52-week high and 13.04% below the 200-day average, a de-rating already reflected.",
+          "No historical multiple series or peer multiples in the bundle, so cheap or expensive versus history and peers is unanswerable."
         ],
         "cited_metrics": [
-          "pillars.valuation.pe_ttm",
-          "pillars.valuation.pe_forward",
-          "pillars.valuation.peg",
-          "pillars.valuation.ev_to_ebitda",
-          "pillars.valuation.dividend_yield_pct"
+          "valuation.pe_ttm",
+          "valuation.pe_forward",
+          "valuation.peg",
+          "valuation.pb",
+          "valuation.dividend_yield_pct"
         ],
         "evidence_gaps": [
-          "No peer benchmarks or industry averages (listed in no_source_for), so relative multiples are unavailable.",
-          "Multiples have no time series (no_time_series_for), so historical percentile or trend cannot be assessed.",
-          "market_cap and ps_ttm are null; no analyst consensus exists to validate the forward PE.",
-          "No filing prose or transcripts to explain what drives the current multiple."
+          "No peer benchmarks or industry averages (no_source_for), so peer-relative multiples cannot be computed.",
+          "Multiples have no time series (no_time_series_for), so historical multiple comparison is impossible.",
+          "market_cap and ps_ttm are null, limiting size and sales-multiple context.",
+          "No analyst consensus or forward estimate source, so forward P/E basis is unverifiable."
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 3073,
+      "tokens": 3510,
       "error": "",
       "violations": []
     },
@@ -291,31 +291,32 @@
       "status": "ok",
       "data": {
         "agent": "technicals",
-        "score": -1.2,
-        "confidence": 0.8,
-        "summary": "Last close 2200.8 is below SMA50 2286.75 and SMA200 2530.74. RSI14 39.82 is weak but not oversold. Volume runs 34.92% below its 20-day average, so participation is thin. Trend structure is negative; no reversal evidence in this bundle.",
+        "score": -1.3,
+        "confidence": 0.75,
+        "summary": "Price is 3.76% below SMA50 and 13.04% below SMA200, a sustained downtrend. RSI14 39.82 is weak but not oversold. Volume runs 34.92% below the 20-day average, so the decline lacks capitulation. Price sits 31.32% below the 52-week high, with no reversal signal in the bundle.",
         "key_points": [
-          "Last close 2200.8 sits below SMA50 2286.75 and SMA200 2530.74; both averages act as overhead resistance.",
-          "RSI14 39.82 is weak but above oversold; no bullish divergence data available.",
-          "Volume 34.92% below 20-day average; thin participation weakens signal conviction.",
-          "No momentum or breadth series in bundle; trend read rests on moving-average position alone."
+          "trend_vs_sma50 -3.76% and trend_vs_sma200 -13.04%: price trades under both averages, downtrend on both horizons.",
+          "RSI14 39.82 is weak but above oversold; momentum is soft without a capitulation reading.",
+          "Volume 34.92% below the 20-day average: the decline is not driven by heavy selling participation.",
+          "Price is 31.32% below the 52-week high, deep in the lower half of its annual range.",
+          "Technicals coverage is full, but the bundle gives no moving-average slope or support/resistance levels."
         ],
         "cited_metrics": [
-          "technicals.last_close",
-          "technicals.sma50",
-          "technicals.sma200",
+          "technicals.trend_vs_sma50",
+          "technicals.trend_vs_sma200",
           "technicals.rsi14",
-          "technicals.volume_vs_20d_avg"
+          "technicals.volume_vs_20d_avg",
+          "technicals.pct_from_52w_high"
         ],
         "evidence_gaps": [
-          "No index or peer relative-strength series; cannot assess outperformance or underperformance.",
-          "No short interest, options, or positioning data; short_ratio is null.",
-          "No volume history beyond the 20-day average; cannot judge accumulation or distribution trend.",
-          "Only daily bars available; no intraday or weekly timeframe confirmation."
+          "No moving-average slope or crossover history; only current SMA levels are given.",
+          "No support/resistance levels or prior price structure to anchor downside targets.",
+          "No relative strength versus index or peers; peer benchmarks are absent from the bundle.",
+          "No short interest or positioning data; short_ratio is null."
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 3773,
+      "tokens": 3922,
       "error": "",
       "violations": []
     },
@@ -324,32 +325,32 @@
       "status": "ok",
       "data": {
         "agent": "sentiment",
-        "score": -1.0,
+        "score": -0.5,
         "confidence": 0.2,
-        "summary": "News flow is unusable: 10 items but all headlines null and no publishers, so nothing can be assessed as priced in. Price-based sentiment proxies are weak, 31.32% below the 52-week high, below both moving averages, RSI 39.82, volume 34.92% under the 20-day average. Score reflects absent news evidence, not a directional call.",
+        "summary": "No usable news flow: all provided headlines are null and the publisher list is empty, so no headline sentiment can be scored. Price-based proxies lean mildly negative: RSI 39.82, 31.32% below the 52-week high, volume 34.92% under the 20-day average. Score reflects absent information, not a directional news call.",
         "key_points": [
-          "All 10 news items have null headlines and no publishers; no news sentiment can be scored.",
-          "Price sits 31.32% below the 52-week high and below both the 50- and 200-day averages.",
-          "RSI14 at 39.82 and volume 34.92% below the 20-day average indicate muted participation.",
-          "Next earnings 2026-10-08 is the only scheduled catalyst present in the bundle.",
-          "Cannot judge whether news is priced in; no consensus, peer or positioning history exists."
+          "All eight supplied headline slots are null and news_publishers is empty; news_count of 10 yields no scorable sentiment.",
+          "RSI14 at 39.82 and price 31.32% below the 52-week high indicate weak, not panicked, positioning.",
+          "Volume 34.92% below the 20-day average suggests low participation, so recent price moves carry limited conviction.",
+          "Next earnings 2026-10-08 is the next scheduled catalyst; no pre-earnings news sentiment is available.",
+          "Cannot judge whether any news is already priced in without headline content."
         ],
         "cited_metrics": [
           "extras.news_count",
-          "technicals.pct_from_52w_high",
           "technicals.rsi14",
-          "technicals.trend_vs_sma200",
-          "technicals.volume_vs_20d_avg"
+          "technicals.pct_from_52w_high",
+          "technicals.volume_vs_20d_avg",
+          "extras.next_earnings"
         ],
         "evidence_gaps": [
-          "news_headlines are all null and news_publishers is empty, so no news content exists to analyse",
-          "No analyst consensus, target prices or estimate revisions (listed in no_source_for)",
-          "No institutional positioning history; holdings are a single current observation only",
-          "No peer or industry sentiment benchmarks for context"
+          "news_headlines are null for every supplied slot; no headline text or tone",
+          "news_publishers empty, so no source or credibility signal",
+          "no analyst consensus, peer benchmarks or institutional positioning history in bundle",
+          "no earnings transcript or filing prose to gauge management tone"
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 2707,
+      "tokens": 2851,
       "error": "",
       "violations": []
     },
@@ -359,31 +360,29 @@
       "data": {
         "agent": "events",
         "score": -0.5,
-        "confidence": 0.3,
-        "summary": "Next earnings dated 2026-10-08, about 25 days after the 2026-09-13 as_of snapshot. No guidance, transcript, or consensus data exists in the bundle. news_count is 10 but every headline is null. Dividend yield and share dilution are single current observations, not trends. Event visibility is poor.",
+        "confidence": 0.35,
+        "summary": "Next earnings scheduled 2026-10-08, 25 days after the 2026-09-13 as-of date, so an event-risk window is open. The bundle carries no guidance, no consensus, and no corporate action calendar. Ten news items exist but every headline is null, so no event content can be assessed.",
         "key_points": [
-          "Next earnings scheduled 2026-10-08, roughly 25 days from the 2026-09-13 as_of date.",
-          "No guidance, earnings estimates, or transcript evidence in bundle; event outcome unforecastable.",
-          "news_count 10 but all headlines null and publishers empty; no event detail available.",
-          "dividend_yield_pct 2.95 and share_dilution_pct -1.24 are single observations, not trends.",
-          "No corporate action calendar (splits, buybacks, record dates) present in bundle."
+          "Next earnings date 2026-10-08, roughly 25 days from the 2026-09-13 as-of timestamp.",
+          "No guidance, consensus, or transcript data in the bundle to frame the print.",
+          "news_count is 10 but all headlines are null and publishers empty, so no event detail.",
+          "Dividend yield 2.95% is a current snapshot, not a declared action or ex-date calendar."
         ],
         "cited_metrics": [
           "extras.next_earnings",
           "context.as_of",
-          "valuation.dividend_yield_pct",
-          "governance.share_dilution_pct",
-          "extras.news_count"
+          "extras.news_count",
+          "valuation.dividend_yield_pct"
         ],
         "evidence_gaps": [
-          "No guidance or management outlook data",
-          "No analyst consensus or earnings estimates",
-          "No corporate action calendar or dividend history",
-          "News headlines and publishers null despite news_count 10"
+          "No guidance figures or management outlook anywhere in the bundle.",
+          "No analyst consensus or estimate revisions (listed in no_source_for).",
+          "No corporate action calendar: dividend declaration, ex-date, buyback, or split.",
+          "No news text, publishers, or transcript content to date the headlines."
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 2527,
+      "tokens": 2383,
       "error": "",
       "violations": []
     },
@@ -393,29 +392,31 @@
       "data": {
         "agent": "flows",
         "score": 0.3,
-        "confidence": 0.25,
-        "summary": "Institutional ownership is a single current snapshot: 17.6% institutions against 71.79% insiders, implying a thin free float. Share count is shrinking (-1.24% dilution), a mildly supportive flow signal. No holder-level or historical positioning data exists in this bundle, so no change over time can be assessed.",
+        "confidence": 0.3,
+        "summary": "Institutional ownership is 17.6% with insiders at 71.79%, a single current snapshot; no holdings history exists in this bundle. Share count fell 1.24% (buyback), a mild supportive flow. Volume is 34.92% below the 20-day average, indicating weak participation. Positioning evidence is thin.",
         "key_points": [
-          "Institutions hold 17.6%, insiders 71.79%, promoter-dominated register with limited institutional float.",
-          "Share dilution of -1.24% indicates net share count reduction, a modestly supportive capital-return flow.",
-          "No holder list, no FII/DII split, no holdings history, positioning changes cannot be measured.",
-          "Short interest unavailable (short_ratio null), so crowding and short positioning are unassessable."
+          "Institutions hold 17.6% and insiders 71.79%; both are current snapshots with no change-over-time data available.",
+          "Share dilution of -1.24% implies a shrinking share count, a modestly supportive capital-return flow signal.",
+          "Volume is 34.92% below the 20-day average, pointing to weak near-term participation.",
+          "Beta of 0.17 suggests low sensitivity to broad index flows.",
+          "No institutional holder names, stakes, or quarter-over-quarter deltas are present in the bundle."
         ],
         "cited_metrics": [
           "risk.held_by_institutions_pct",
           "governance.held_by_insiders_pct",
           "governance.share_dilution_pct",
-          "risk.short_ratio"
+          "technicals.volume_vs_20d_avg",
+          "risk.beta"
         ],
         "evidence_gaps": [
-          "data_quality.no_time_series_for lists holdings and institutional positioning changes, no trend computable.",
-          "extras.institutional_holders is empty: no named holders, position sizes, or quarter-over-quarter deltas.",
-          "No FII/DII or mutual-fund breakdown, no free float or market cap for ownership context.",
-          "short_ratio is null; no short interest, borrow, or securities-lending data."
+          "extras.institutional_holders is empty: no holder names, stake sizes, or fund-level detail",
+          "data_quality lists holdings and institutional positioning changes as having no time series",
+          "short_ratio and market_cap are null, blocking short-interest and index-weight flow proxies",
+          "No FII/DII, block deal, or promoter pledge data in the bundle"
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 2569,
+      "tokens": 2896,
       "error": "",
       "violations": []
     },
@@ -425,28 +426,31 @@
       "data": {
         "agent": "macro",
         "score": 0.0,
-        "confidence": 0.15,
-        "summary": "Bundle contains no index, rates, or FX series, so the macro backdrop is unassessable. Only sector (Technology / IT Services) and INR reporting currency are given. Beta 0.17 is a single current snapshot, not a trend. Macro score held neutral at 0.0 with low confidence.",
+        "confidence": 0.2,
+        "summary": "No index, rates or FX series exist in this bundle, so the macro backdrop cannot be assessed. Only sector (Technology), currency (INR) and beta 0.17 are available; low beta implies limited broad-market sensitivity. Score neutral.",
         "key_points": [
-          "No index, rates, or FX series in bundle; macro backdrop cannot be scored from this evidence.",
-          "Sector is Technology / Information Technology Services; reporting currency is INR.",
-          "Beta 0.17 is a current snapshot only, with no history, so no directional read.",
-          "No peer, industry-average, or consensus data; relative macro positioning is unverifiable."
+          "Bundle contains no index, rates or FX series; macro backdrop is unassessable from this evidence.",
+          "Sector is Technology, Information Technology Services; currency INR; no peer or industry benchmark supplied.",
+          "Beta 0.17 indicates low sensitivity to broad market moves, as a single current observation.",
+          "Annualised volatility 28.01% and price 13.04% below sma200 describe market conditions, not macro drivers.",
+          "No analyst consensus, index levels or rate expectations available to frame the sector backdrop."
         ],
         "cited_metrics": [
           "context.sector",
           "context.currency",
-          "risk.beta"
+          "risk.beta",
+          "technicals.vol_ann_pct",
+          "technicals.trend_vs_sma200"
         ],
         "evidence_gaps": [
-          "Index, rates, and FX series absent per data_quality.no_source_for",
-          "No peer benchmarks or industry averages",
-          "No analyst consensus or macro forecasts",
-          "news_headlines entries are null; no macro news content"
+          "No index level or index return series for the NSE or any benchmark",
+          "No interest rate, policy rate or yield curve data",
+          "No FX series despite INR being the reporting currency",
+          "No peer or industry average for sector-relative macro context"
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 2581,
+      "tokens": 2683,
       "error": "",
       "violations": []
     },
@@ -455,32 +459,31 @@
       "status": "ok",
       "data": {
         "agent": "governance",
-        "score": -0.3,
+        "score": 0.5,
         "confidence": 0.35,
-        "summary": "Promoter/insider stake of 71.79% dominates a 17.6% institutional base; dilution of -1.24% implies net buyback. Audit, compensation and governance risk scores are absent, and governance pillar coverage is only 0.375, so board and pay quality cannot be assessed. Holdings are single snapshots, not trends.",
+        "summary": "Insider holding of 71.79% concentrates control; institutions hold 17.6%. Share dilution is -1.24%, consistent with buyback rather than issuance. Audit, compensation and overall governance risk scores are absent, and no insider transaction or holder detail is available, so the governance read is thin.",
         "key_points": [
-          "Insiders hold 71.79% versus institutions at 17.6%, a concentrated promoter base with limited institutional counterweight.",
-          "Share dilution is -1.24%, indicating net share count reduction rather than issuance.",
-          "Audit, compensation, governance and overall risk fields are null; no board or pay data.",
-          "Governance pillar coverage is 0.375, the weakest of the five pillars.",
-          "Holdings are current snapshots only; no time series for institutional positioning changes."
+          "Insiders hold 71.79%, a concentrated promoter stake; institutions hold 17.6%.",
+          "Share dilution of -1.24% signals net share reduction, likely buyback, not equity issuance.",
+          "Audit, compensation and overall governance risk fields are null, so those risks cannot be scored.",
+          "No insider buy or sell transactions, holder names or shares outstanding appear in the bundle.",
+          "Governance pillar coverage is 0.375, the lowest of the five pillars."
         ],
         "cited_metrics": [
           "pillars.governance.held_by_insiders_pct",
           "pillars.governance.held_by_institutions_pct",
           "pillars.governance.share_dilution_pct",
-          "pillar_coverage.governance",
-          "pillars.governance.audit_risk"
+          "pillar_coverage.governance"
         ],
         "evidence_gaps": [
-          "audit_risk, compensation_risk, governance_risk and overall_risk are all null.",
-          "shares_outstanding is null, so dilution cannot be cross-checked against share count.",
-          "institutional_holders list is empty; no holder-level detail.",
-          "No peer or industry governance benchmarks exist in this bundle."
+          "audit_risk, compensation_risk, governance_risk and overall_risk are all null",
+          "shares_outstanding is null",
+          "no insider transaction history and institutional_holders list is empty",
+          "holdings are current snapshots only, with no time series for positioning changes"
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 3748,
+      "tokens": 2793,
       "error": "",
       "violations": []
     },
@@ -489,31 +492,32 @@
       "status": "ok",
       "data": {
         "agent": "risk",
-        "score": -1.0,
-        "confidence": 0.85,
-        "summary": "Risk profile is elevated: annualised volatility 28.01%, max drawdown -53.07%, and trend vs SMA200 -13.04%. Low beta 0.17 and insider concentration 71.79% are notable. Position sizing should account for high realised volatility and deep drawdown despite low leverage.",
+        "score": -0.5,
+        "confidence": 0.6,
+        "summary": "Low beta 0.17 and modest leverage temper market sensitivity, but standalone risk is high: 28.01% annualised vol, -53.07% max drawdown, 17.94% downside deviation, price 31.32% below the 52-week high and below both moving averages. Insider ownership of 71.79% concentrates float risk.",
         "key_points": [
-          "Annualised volatility 28.01% signals high standalone risk; low beta 0.17 does not neutralise it.",
-          "Max drawdown -53.07% is severe; position sizing should be conservative.",
-          "Trend vs SMA200 -13.04% shows sustained downtrend; price is below both moving averages.",
-          "Insider holding 71.79% is concentrated; no history or peer benchmark to contextualise."
+          "Beta 0.17 is low, but 28.01% annualised vol and 17.94% downside deviation show high standalone risk.",
+          "Max drawdown -53.07% and price 31.32% below the 52-week high confirm a deep, unresolved drawdown.",
+          "Leverage is low and cash conversion strong, so balance-sheet risk is not the driver here.",
+          "Insider ownership dominates the register, concentrating float and liquidity risk.",
+          "Weak volume and sub-50 RSI suggest no capitulation yet; position sizing should stay modest."
         ],
         "cited_metrics": [
+          "risk.beta",
           "risk.annualised_vol_pct",
           "risk.max_drawdown_pct",
-          "risk.beta",
-          "technicals.trend_vs_sma200",
-          "governance.held_by_insiders_pct"
+          "risk.downside_deviation_pct",
+          "technicals.pct_from_52w_high"
         ],
         "evidence_gaps": [
-          "No peer/industry risk benchmarks to contextualise beta, volatility, or drawdown.",
-          "Net debt/EBITDA and short ratio are null; leverage and short positioning cannot be assessed.",
-          "Holdings and multiples have no time series, so positioning changes cannot be measured.",
-          "No analyst consensus, index/rates/FX, or transcripts for macro/event risk."
+          "No peer, index or sector benchmarks, so beta and volatility cannot be judged relative to the sector.",
+          "short_ratio, net_debt_to_equity and share_dilution are null in the risk pillar.",
+          "No portfolio context: no position weights, correlations or holding-period constraints for sizing.",
+          "Holdings are current snapshots only, so institutional positioning changes cannot be assessed."
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 4766,
+      "tokens": 3456,
       "error": "",
       "violations": []
     }
@@ -524,52 +528,50 @@
       "status": "ok",
       "data": {
         "role": "bull",
-        "thesis": "TCS is a high-quality, low-leverage compounder trading at mid-teens earnings and 10.6x EV/EBITDA with a 2.95% dividend yield. Operating margin 25.1%, ROE 45.89%, and 1.06 cash conversion show durable profitability and cash generation. Growth is modest and the price trend is weak, but valuation and balance sheet provide downside support if earnings hold.",
+        "thesis": "TCS is a high-return, cash-generative compounder trading at a de-rated multiple. ROE 45.89%, operating margin 25.1%, FCF margin 17.96% and cash conversion 1.06 sit alongside debt-to-equity 0.11. Forward P/E 13.54, EV/EBITDA 10.6 and a 2.95% dividend yield offer support after a 31.32% drawdown from the 52-week high. The main soft spot is 4.58% revenue growth.",
         "arguments": [
           {
-            "claim": "Trailing PE 16.0 is undemanding for a business with 25.1% operating margin, offering valuation support if earnings hold.",
-            "evidence": "pillars.valuation.pe_ttm"
+            "claim": "Return on equity of 45.89% and return on assets of 26.98% show capital efficiency far above what the current multiple implies, and margins remain wide at 25.1% operating and 18.43% net.",
+            "evidence": "pillars.fundamentals.roe_pct"
           },
           {
-            "claim": "Forward PE 13.54 below trailing PE 16.0 implies expected earnings growth, which could support re-rating if delivered.",
-            "evidence": "pillars.valuation.pe_forward"
-          },
-          {
-            "claim": "Operating margin 25.1% and net margin 18.43% demonstrate pricing power and cost discipline in IT services.",
-            "evidence": "pillars.fundamentals.operating_margin_pct"
-          },
-          {
-            "claim": "OCF/net income 1.06 shows earnings convert to cash, funding dividends and buybacks without leverage.",
+            "claim": "Free cash flow of INR 479.48bn at a 17.96% margin, with operating cash conversion of 1.06 times net income, means reported earnings are backed by cash rather than accruals.",
             "evidence": "pillars.fundamentals.cash_conversion_ocf_over_ni"
           },
           {
-            "claim": "Debt/equity 0.11 leaves balance-sheet capacity to sustain dividends and buybacks through a weak demand cycle.",
+            "claim": "Debt-to-equity of 0.11 leaves the balance sheet close to unlevered, so the earnings stream is not exposed to refinancing or rate risk, and cash to assets is 3.51%.",
             "evidence": "pillars.fundamentals.debt_to_equity"
+          },
+          {
+            "claim": "At 13.54x forward earnings and 10.6x EV/EBITDA, with a 2.95% dividend yield, the shares are priced for little growth after falling 31.32% from the 52-week high.",
+            "evidence": "pillars.valuation.pe_forward"
+          },
+          {
+            "claim": "A share count change of -1.24% indicates net buyback rather than issuance, returning capital per share, while beta of 0.17 limits sensitivity to broad index moves.",
+            "evidence": "pillars.governance.share_dilution_pct"
           }
         ],
         "key_metrics": [
-          "pillars.valuation.pe_ttm",
-          "pillars.valuation.pe_forward",
-          "pillars.valuation.ev_to_ebitda",
-          "pillars.valuation.dividend_yield_pct",
-          "pillars.fundamentals.operating_margin_pct",
-          "pillars.fundamentals.net_margin_pct",
           "pillars.fundamentals.roe_pct",
+          "pillars.fundamentals.operating_margin_pct",
           "pillars.fundamentals.fcf_margin_pct",
           "pillars.fundamentals.cash_conversion_ocf_over_ni",
           "pillars.fundamentals.debt_to_equity",
+          "pillars.valuation.pe_forward",
+          "pillars.valuation.ev_to_ebitda",
+          "pillars.valuation.dividend_yield_pct",
           "pillars.governance.share_dilution_pct",
           "pillars.risk.beta"
         ],
         "what_would_break_this": [
-          "Revenue growth turns negative or decelerates below 4.58% without margin offset.",
-          "Operating margin falls below 20% or net margin below 15%.",
-          "OCF/net income falls below 1.0 or FCF margin below 15%.",
-          "Dividend or buyback is cut, or debt/equity rises materially above 0.11."
+          "Revenue growth of 4.58% decelerates further or turns negative, undercutting the forward multiple.",
+          "Operating margin falls below the current 25.1% or net margin compresses from 18.43%.",
+          "Cash conversion drops below 1.0 or FCF margin falls well under 17.96%.",
+          "Price closes below the 52-week low of 1971.79, extending the existing downtrend."
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 7285,
+      "tokens": 5178,
       "error": "",
       "violations": []
     },
@@ -578,37 +580,37 @@
       "status": "ok",
       "data": {
         "role": "bear",
-        "rebuttal": "The bull case rests on trailing quality and a low headline multiple, but the bundle shows growth of only 4.58% and PEG 2.88, so 16x is not obviously cheap. Price is 13.04% below SMA200 and 31.32% off the 52-week high on weak volume. Cash conversion of 1.06 is a thin cushion, not proof of durable funding. Low debt cannot offset demand risk, and 71.79% insider holding limits institutional validation.",
+        "rebuttal": "Bull case leans on quality metrics but skips growth-adjusted valuation and price action. Revenue growth is 4.58% while PEG is 2.88, so 13.54x forward is not obviously cheap. FCF of 479.48bn is below net income of 492.1bn, making the 1.06 conversion less reassuring. Cash is only 3.51% of assets. Beta 0.17 coexists with 28.01% volatility and a -53.07% drawdown. Insiders hold 71.79% with governance coverage 0.375. Price sits below both moving averages.",
         "attacks": [
           {
-            "bull_claim": "Trailing PE 16.0 is undemanding for 25.1% operating margin.",
-            "counter": "PEG 2.88 and revenue growth 4.58% show the multiple is not cheap relative to growth. A 25.1% margin does not justify 16x if top line barely grows.",
+            "bull_claim": "Forward P/E 13.54 and EV/EBITDA 10.6 mean shares are priced for little growth.",
+            "counter": "PEG is 2.88, so the multiple is not cheap relative to 4.58% revenue growth. Forward P/E 13.54 already assumes earnings expansion; the de-rating reflects slower growth, not mispricing.",
             "evidence": "pillars.valuation.peg"
           },
           {
-            "bull_claim": "Forward PE 13.54 below trailing PE 16.0 implies expected earnings growth.",
-            "counter": "Forward PE depends on analyst estimates, but the bundle has no analyst consensus source. It is an unsupported projection, not evidence. Trailing PE 16 with PEG 2.88 already prices modest growth.",
-            "evidence": "data_quality.no_source_for"
+            "bull_claim": "FCF of INR 479.48bn and 1.06 cash conversion show earnings are cash-backed.",
+            "counter": "FCF of 479.48bn is below net income of 492.1bn, so FCF/NI is 0.97. The 1.06 conversion is operating cash flow before capex, not free cash flow.",
+            "evidence": "pillars.fundamentals.fcf"
           },
           {
-            "bull_claim": "Operating margin 25.1% and net margin 18.43% demonstrate pricing power and cost discipline.",
-            "counter": "No peer benchmarks or industry averages are in the bundle, so pricing power is unproven. Margins are trailing; with revenue growth 4.58% and weak demand, they can compress.",
-            "evidence": "data_quality.no_source_for"
+            "bull_claim": "Debt-to-equity 0.11 leaves the balance sheet close to unlevered and low risk.",
+            "counter": "Cash is only 3.51% of assets, so the balance sheet is not cash-rich. Low leverage does not offset a 28.01% annualised vol and -53.07% max drawdown.",
+            "evidence": "pillars.fundamentals.cash_to_assets_pct"
           },
           {
-            "bull_claim": "OCF/net income 1.06 shows earnings convert to cash, funding dividends and buybacks without leverage.",
-            "counter": "1.06 is only a 6% cushion above breakeven. Cash-to-assets is just 3.51%, so cash generation is not building a large buffer. A small working-capital swing could push conversion below 1.0.",
-            "evidence": "pillars.fundamentals.cash_conversion_ocf_over_ni"
+            "bull_claim": "Beta of 0.17 limits sensitivity to broad index moves.",
+            "counter": "Beta 0.17 did not prevent a 31.32% fall from the 52-week high, 28.01% annualised volatility, or -53.07% max drawdown. Low beta is not low risk.",
+            "evidence": "pillars.risk.beta"
           },
           {
-            "bull_claim": "Debt/equity 0.11 leaves balance-sheet capacity to sustain dividends and buybacks through a weak demand cycle.",
-            "counter": "Low debt does not create demand. Price is 13.04% below SMA200 and 31.32% off the 52-week high, volume is down 34.92%, and insider holding is 71.79%, limiting institutional support.",
-            "evidence": "technicals.trend_vs_sma200"
+            "bull_claim": "Share count change of -1.24% indicates net buyback returning capital per share.",
+            "counter": "A -1.24% change is marginal and governance coverage is only 0.375. Insiders hold 71.79%, institutions 17.6%, so buyback durability and float liquidity are unproven.",
+            "evidence": "pillars.governance.share_dilution_pct"
           },
           {
-            "bull_claim": "Valuation and balance sheet provide downside support if earnings hold.",
-            "counter": "Downside support is not evident: max drawdown is -53.07%, annualized volatility 28.01%, and RSI 39.82. The stock is in a downtrend, so valuation can compress further if growth stays at 4.58%.",
-            "evidence": "risk.max_drawdown_pct"
+            "bull_claim": "After a 31.32% drawdown, the shares offer support at a de-rated multiple.",
+            "counter": "Price is 13.04% below the 200-day SMA and 3.76% below the 50-day, with volume 34.92% below average. The downtrend is intact; cheapness can persist.",
+            "evidence": "pillars.technicals.trend_vs_sma200"
           }
         ],
         "strongest_bear_metric": {
@@ -616,63 +618,66 @@
           "value": 2.88
         },
         "unresolved": [
-          "What is the dividend payout ratio and buyback pace needed to sustain the 2.95% yield?",
-          "How much of the 4.58% revenue growth is organic versus currency or acquisitions?",
-          "What peer or industry margin benchmarks validate the claimed pricing power?",
-          "What is the source and revision trend for the forward PE 13.54 estimate?"
+          "Is the 4.58% revenue growth rate stabilizing or decelerating by segment and geography?",
+          "What capex and working capital changes explain FCF falling below net income?",
+          "What is the free float and liquidity impact of 71.79% insider ownership?",
+          "What drove the -53.07% max drawdown and is that risk recurring?"
         ]
       },
       "model": "deepseek-v4.1-flash:cloud",
-      "tokens": 6435,
+      "tokens": 5725,
       "error": "",
       "violations": []
     }
   },
   "verification": {
-    "claims_found": 173,
-    "verified": 141,
-    "derived_from_evidence": 27,
+    "claims_found": 178,
+    "verified": 174,
+    "derived_from_evidence": 4,
     "unverified": 0,
-    "grounding_rate": 0.971,
+    "grounding_rate": 1.0,
     "unverified_details": [],
+    "unverified_at": [],
     "verdict": "PASS",
     "agent_violations": {},
-    "failed_agents": []
+    "failed_agents": [],
+    "unverified_by_agent": {}
   },
   "resumed_from": null,
   "judge": {
     "agent": "judge",
     "status": "ok",
     "data": {
-      "explanation": "The rubric's split verdict reflects a genuine quality-versus-momentum tension that both debaters surfaced with grounded evidence. SHORT_TERM lands NEUTRAL (0.246) because that horizon weights technicals at 0.35 and risk at 0.30, and the evidence there is unambiguous: the close of 2200.8 sits below both the SMA50 (2286.75) and SMA200 (2530.74), 13.04% under the 200-day and 31.32% off the 52-week high, on volume 34.92% below its 20-day average, with a -53.07% max drawdown in the history, the -0.75 technicals score largely cancels the +1.143 fundamentals and +1.0 valuation scores. LONG_TERM turns BULLISH (0.796) because fundamentals (0.32) and valuation (0.26) dominate there, and TCS's 25.1% operating margin, 18.43% net margin, 45.89% ROE, 1.06 cash conversion, 0.11 debt/equity, and 16x trailing PE at 10.6x EV/EBITDA with a 2.95% yield are objectively strong; the bear's best attack, PEG 2.88 against 4.58% revenue growth showing the multiple is not growth-supported, dents the re-rating thesis but cannot overturn the quality and balance-sheet evidence the long-horizon rubric rewards. Verification passed at 97.1% grounding with zero unverified claims, so the verdict rests on solid data even though sentiment, events, flows, and macro pillars carried almost no usable evidence (all 10 news headlines null, no index/rates/FX series), and those pillars are excluded from the rubric weights anyway, so their emptiness lowers context confidence without changing the deterministic outcome.",
+      "explanation": "The deterministic rubric splits the verdict by horizon and both outcomes follow directly from how the pillar weights are set. SHORT_TERM lands NEUTRAL at 0.246 because technicals carry 35% weight and score -0.75 (price 3.76% below SMA50 and 13.04% below SMA200, RSI14 39.82, volume 34.92% below its 20-day average) while risk carries 30% weight at 0.667, so the strong quality block (fundamentals 1.143 on ROE 45.89%, operating margin 25.1%, debt-to-equity 0.11; valuation 1.0 on forward P/E 13.54 and EV/EBITDA 10.6) is diluted to roughly a quarter of the scale. LONG_TERM lands BULLISH at 0.796 because the weights rotate toward fundamentals (32%), valuation (26%) and governance (20%), leaving technicals at only 7%, so the same evidence base that is neutral over weeks is constructive over years. The bear's rebuttal did real damage on growth-adjusted valuation (PEG 2.88 against 4.58% revenue growth) and on the cash-conversion claim (FCF of INR 479.48bn sits below net income of INR 492.1bn, so FCF/NI is about 0.97, not 1.06), but it did not dislodge the balance-sheet, margin or leverage pillars that dominate the long-horizon score. Verification passed with 174 of 178 claims grounded and zero unverified, so the disagreement is about interpretation and missing context, not about fabricated numbers.",
       "bull_case_held": [
-        "Balance-sheet strength: debt/equity of 0.11 with 45.89% ROE gives real capacity to sustain dividends and buybacks through a weak demand cycle.",
-        "Earnings quality in absolute terms: 25.1% operating margin, 18.43% net margin, and 17.96% FCF margin are high regardless of peer context.",
-        "Cash conversion of 1.06 confirms earnings become cash, even though the bear correctly noted the cushion is thin.",
-        "Absolute valuation is not demanding: 16x trailing PE, 10.6x EV/EBITDA, a 2.95% dividend yield, and a shrinking share count (-1.24% dilution) support the long-horizon case."
+        "ROE of 45.89% with operating margin 25.1% and net margin 18.43% shows capital efficiency and pricing power that the de-rated multiple does not obviously reflect.",
+        "Debt-to-equity of 0.11 keeps the earnings stream close to unlevered, and the bear's cash-to-assets counter (3.51%) does not negate that low leverage.",
+        "Forward P/E 13.54, EV/EBITDA 10.6 and a 2.95% dividend yield give valuation support after a 31.32% drawdown from the 52-week high, and the rubric scored the valuation pillar at 1.0.",
+        "Beta of 0.17 was accepted as a genuine risk-pillar positive (scored +2), even though the bear correctly noted it did not prevent the drawdown.",
+        "The -1.24% share count change is consistent with net buyback rather than issuance, and the rubric scored dilution as a positive governance signal."
       ],
       "bull_case_broken": [
-        "Forward PE 13.54 as evidence of expected earnings growth: the bundle has no analyst consensus source, so the bull's re-rating argument rests on an unsupported projection.",
-        "Pricing power claim: with no peer or industry benchmarks in the bundle, 25.1% margins are trailing facts, not proof of durable pricing power.",
-        "Downside support if earnings hold: the -53.07% max drawdown and confirmed downtrend show the multiple can compress further, and PEG 2.88 against 4.58% growth means 16x is not cheap relative to growth.",
-        "Cash conversion as proof of durable funding: 1.06 is only a 6% cushion above breakeven and cash-to-assets is 3.51%, so a modest working-capital swing could push conversion below 1.0."
+        "The claim that 1.06 operating cash conversion proves earnings are cash-backed: the bear showed FCF of INR 479.48bn is below net income of INR 492.1bn, so free cash flow conversion is roughly 0.97.",
+        "The claim that 13.54x forward earnings means the shares are priced for little growth: PEG of 2.88 against 4.58% revenue growth shows the multiple is not cheap on a growth-adjusted basis.",
+        "The claim that beta 0.17 means low risk: 28.01% annualised volatility, a -53.07% max drawdown and a 31.32% fall from the 52-week high show low beta is not low standalone risk.",
+        "The claim that the buyback is a durable capital return signal: a -1.24% change is marginal and governance coverage is thin, with insiders at 71.79% and institutions at 17.6%.",
+        "The claim that a 31.32% drawdown creates support: price remains below both moving averages with volume 34.92% under average, so the downtrend is intact and cheapness can persist."
       ],
       "open_questions": [
-        "How much of the 4.58% revenue growth is organic versus currency or acquisition-driven?",
-        "What is the dividend payout ratio and buyback pace required to sustain the 2.95% yield?",
-        "What peer or industry margin benchmarks would confirm or refute the claimed pricing power?",
-        "What is the source and revision trend behind the forward PE 13.54 estimate?",
-        "What catalyst could reverse the technical downtrend, price reclaiming the SMA50/SMA200 or volume normalizing from -34.92%?",
-        "What does the 2026-10-08 earnings report reveal about demand trajectory and margin guidance?",
-        "What is actually priced in, given that all 10 news headlines were null and sentiment could not be assessed?",
-        "How does the missing macro backdrop, global IT-services demand, USD/INR, and rates, affect the growth outlook?"
+        "Is the 4.58% revenue growth rate stabilising or decelerating, and how does that split by segment and geography?",
+        "What capex and working capital movements explain free cash flow falling below net income, and is that a one-year effect or a trend?",
+        "What is the free float and liquidity impact of 71.79% insider ownership, and how does it affect buyback durability and index flows?",
+        "What drove the -53.07% max drawdown, and is that risk recurring or a one-off episode?",
+        "Will the 2026-10-08 earnings date, 25 days after the as-of date, resolve the growth question or add event risk given there is no consensus or guidance in the bundle?",
+        "Can the technical downtrend reverse without capitulation volume, given volume is 34.92% below the 20-day average?",
+        "Are the current multiples actually cheap without peer, industry or historical multiple benchmarks, none of which exist in this bundle?"
       ],
-      "biggest_uncertainty": "Whether revenue growth re-accelerates from 4.58%, with PEG at 2.88, the long-term bullish verdict hinges on growth that the bundle's absent consensus, peer, and macro data can neither confirm nor refute."
+      "biggest_uncertainty": "Whether 4.58% revenue growth is a trough or a new normal, because that single unknown drives the growth-adjusted valuation case and the long-horizon bullish verdict rests on quality metrics that a further growth slowdown would eventually erode."
     },
-    "model": "glm-5.3:cloud",
-    "tokens": 7302,
-    "error": "primary deepseek-v4.1-flash:cloud failed: output truncated at max_tokens=4680 (~8796 tokens used)",
+    "model": "deepseek-v4.1-flash:cloud",
+    "tokens": 5826,
+    "error": "",
     "violations": []
   },
-  "elapsed_s": 183.0
+  "elapsed_s": 65.8
 }

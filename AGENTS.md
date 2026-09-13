@@ -18,7 +18,7 @@ intact in every change: the LLM layer interprets, the Python layer decides.
 | `src/data.py` | Evidence fetch: yfinance, SEC EDGAR XBRL. Every value carries a source string. | Yes, but never drop the source strings. |
 | `src/metrics.py` | 5 metric pillars. Pure functions of the bundle. | Yes. New metrics must be scored or exempted (see below). |
 | `src/rubric.py` | Signal tables, weights, coverage-diluted scoring. The decision layer. | **Owner decision.** Band or weight changes rescore the whole corpus. |
-| `src/verify.py` | Matches every agent-emitted number to evidence or derived ratio. | Yes, keep it strict. |
+| `src/verify.py` | Matches every agent-emitted number to evidence or to a derived value whose metrics are named beside it. | Yes, keep it strict. |
 | `src/agents.py` | 9 specialists, Bull, Bear, Judge. Strict JSON, prompt limits, fallback model. | Yes. Read "Prompt bounding" in the README first. |
 | `analyze.py` | Orchestration, run artefacts, resume. | Yes. |
 | `tests/` | Determinism, sign-direction, grounding invariants. | Extend on every fix. |
@@ -112,6 +112,17 @@ comments alike.
 - **Relative links between documents, including to anchors:** `[Part 5](GitHub/copilot-pilot.md#part-5--decide)`.
 - **Don't duplicate content across documents.** Link to the one that owns
   the topic.
+
+## Verification scope (src/verify.py)
+
+- **Names, not just values.** A number matches an evidence value, or a derived value whose
+  two metrics are named beside it. Extend `METRIC_ALIASES` when agents start citing a metric
+  by a name the table does not cover, or honest prose gets flagged.
+- **`unverified == 0` is not proof of grounding.** Value-level matching still accepts 98% of
+  random numbers in 0.05..100 on an AAPL bundle (measured 2026-09-13). The paragraph-level
+  guard is `test_a_fully_invented_paragraph_is_reviewed`.
+- **REVIEW is informational.** It appends a warning and `verification.unverified_by_agent`.
+  It must never reach a score: the rubric is computed before any agent runs.
 
 ## Owner decisions on the share-count metric (2026-09-13)
 
