@@ -187,6 +187,100 @@ def strip_em_dashes(value):
     return value
 
 
+# Output limits are stated as hard requirements in every prompt, and a prompt is not
+# an enforcement mechanism: the models overran them in the 2026-09-12 runs (a 12
+# argument bull case against a stated maximum of 5, 8 of 9 summaries over 60 words,
+# a 143 word thesis against 80). Same reasoning as rule 7: a rule the pipeline depends
+# on has to hold in Python. Each entry is (path, kind, cap), where "[]." addresses a
+# field inside a list of objects.
+SPECIALIST_LIMITS = (
+    ("summary", "words", 60),
+    ("key_points", "items", 5),
+    ("key_points[]", "words", 25),
+    ("cited_metrics", "items", 5),
+    ("evidence_gaps", "items", 4),
+)
+BULL_LIMITS = (
+    ("thesis", "words", 80),
+    ("arguments", "items", 5),
+    ("arguments[].claim", "words", 40),
+    ("what_would_break_this", "items", 4),
+)
+BEAR_LIMITS = (
+    ("rebuttal", "words", 90),
+    ("attacks", "items", 6),
+    ("attacks[].counter", "words", 45),
+    ("unresolved", "items", 4),
+)
+# The judge's prompt states no numeric caps: it explains a verdict and lists open
+# questions, so there is nothing to count.
+LIMITS_BY_AGENT = {"bull": BULL_LIMITS, "bear": BEAR_LIMITS, "judge": ()}
+
+# The bear is shown the bull's case, trimmed to the protocol caps so its input stays
+# bounded. Shared by the run and the resume path, which had separate copies of this.
+BULL_ARGUMENT_CAP = 5
+BREAK_CONDITION_CAP = 4
+
+
+def _words(value) -> int:
+    return len(value.split()) if isinstance(value, str) else 0
+
+
+def check_limits(data: dict, limits, trim: bool = True) -> tuple[list[str], list[str]]:
+    """Enforce the stated output limits. Returns (violations, retryable).
+
+    Item overruns are trimmed in place and reported: the protocol caps the count, and
+    a downstream agent is shown a trimmed view anyway, so the stored output should
+    match what the rest of the pipeline sees. Word overruns are reported as retryable
+    and never trimmed, because cutting prose mid-sentence loses meaning silently.
+    """
+    violations: list[str] = []
+    retryable: list[str] = []
+    for path, kind, cap in limits:
+        if "[].claim" in path or "[].counter" in path:
+            head, field = path.split("[].", 1)
+            for i, item in enumerate(data.get(head) or []):
+                if isinstance(item, dict) and _words(item.get(field)) > cap:
+                    msg = (f"over limit: {head}[{i}].{field} is "
+                           f"{_words(item.get(field))} words (max {cap})")
+                    violations.append(msg)
+                    retryable.append(msg)
+            continue
+        if path.endswith("[]"):
+            head = path[:-2]
+            for i, item in enumerate(data.get(head) or []):
+                if _words(item) > cap:
+                    msg = f"over limit: {head}[{i}] is {_words(item)} words (max {cap})"
+                    violations.append(msg)
+                    retryable.append(msg)
+            continue
+        value = data.get(path)
+        if kind == "items" and isinstance(value, list) and len(value) > cap:
+            violations.append(f"over limit: {path} had {len(value)} items (max {cap}), "
+                              f"trimmed to {cap}")
+            if trim:
+                del value[cap:]
+        elif kind == "words" and isinstance(value, str) and _words(value) > cap:
+            msg = f"over limit: {path} is {_words(value)} words (max {cap})"
+            violations.append(msg)
+            retryable.append(msg)
+    return violations, retryable
+
+
+def bull_view(bull) -> dict:
+    """The bull case as the bear sees it: the protocol caps, nothing else."""
+    data = bull.data if hasattr(bull, "data") else (bull or {})
+    args = (data.get("arguments") or [])[:BULL_ARGUMENT_CAP]
+    return {
+        "role": "bull",
+        "thesis": data.get("thesis"),
+        "arguments": [{"claim": a.get("claim"), "evidence": a.get("evidence")}
+                      for a in args if isinstance(a, dict)],
+        "what_would_break_this": (data.get("what_would_break_this")
+                                  or [])[:BREAK_CONDITION_CAP],
+    }
+
+
 # The five pillars the bundle always reports coverage for. Citing one of these is
 # legitimate provenance, so "pillar_coverage.governance" is accepted even when a
 # test fixture omits the block. Any other sub-field is not a real key.
@@ -286,6 +380,18 @@ def _check_citations(data: dict, bundle: dict) -> list[str]:
         cited = [cited]
     elif isinstance(cited, dict):
         cited = list(cited.keys()) + [v for v in cited.values() if isinstance(v, str)]
+    # The debate agents cite a path per item, in a field the citation list does not
+    # cover: "evidence" beside each bull argument and each bear attack, plus the bear's
+    # strongest metric. Checked against the same allowlist, because an unchecked key
+    # path is how a fabricated provenance reads as rigorous.
+    cited = list(cited)
+    for field in ("arguments", "attacks"):
+        for item in data.get(field) or []:
+            if isinstance(item, dict) and isinstance(item.get("evidence"), str):
+                cited.append(item["evidence"])
+    strongest = data.get("strongest_bear_metric")
+    if isinstance(strongest, dict) and isinstance(strongest.get("key"), str):
+        cited.append(strongest["key"])
     bad = []
     for c in cited:
         if not isinstance(c, str):
@@ -313,12 +419,16 @@ def call_agent(name: str, system: str, payload: dict, model: str = DEFAULT_MODEL
     """
     user = json.dumps(payload, indent=1, default=str)[:14000]
     last_err = ""
+    limits = LIMITS_BY_AGENT.get((name or "").lower(), SPECIALIST_LIMITS)
+    best: AgentResult | None = None
+    correction = ""
     for attempt in range(retries + 1):
         try:
             kwargs = {"response_format": {"type": "json_object"}} if strict_json else {}
             r = client().chat.completions.create(
                 model=model,
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                messages=[{"role": "system", "content": system},
+                          {"role": "user", "content": user + correction}],
                 max_tokens=max_tokens,
                 temperature=0.2,
                 **kwargs,
@@ -335,12 +445,29 @@ def call_agent(name: str, system: str, payload: dict, model: str = DEFAULT_MODEL
                 last_err = f"unparseable JSON on attempt {attempt + 1} (finish={choice.finish_reason})"
                 continue
             data = strip_em_dashes(data)
-            return AgentResult(
+            violations, retryable = check_limits(data, limits)
+            result = AgentResult(
                 name=name, status="ok", data=data, raw=raw, model=model, tokens=tokens,
-                violations=_check_citations(data, payload),
+                violations=_check_citations(data, payload) + violations,
             )
+            # Keep the cleanest attempt. A result with no limit violation is returned at
+            # once; a violating one is re-asked once with the broken limits restated,
+            # and the attempt with the fewest violations wins if none comes back clean.
+            if best is None or len(result.violations) < len(best.violations):
+                best = result
+            if not violations:
+                return result
+            if retryable and attempt < retries:
+                correction = ("\n\nCORRECTION from the pipeline: the previous answer broke "
+                              "the stated output limits: " + "; ".join(retryable) +
+                              ". Return the same analysis again, inside every limit. Cut "
+                              "filler and repetition, not substance.")
+                continue
+            return result
         except Exception as e:
             last_err = f"{type(e).__name__}: {str(e)[:200]}"
+    if best is not None:
+        return best
     return AgentResult(name=name, status="unavailable", data={}, error=last_err, model=model)
 
 
@@ -426,25 +553,12 @@ def run_debate(bundle: dict, specialists: dict, model: str = DEFAULT_MODEL) -> d
         model=model, max_tokens=2600,
     )
 
-    # The bear gets the bull case but not the specialist digest: it attacks the
-    # bull, and digest noise was what pushed it past the token ceiling.
-    # The bull's arguments are trimmed to 6 (claim + key path only): a bull that
-    # emits 11 verbose arguments makes the bear exceed every retry ceiling, because
-    # the output is proportional to the input.
-    if bull.status == "ok":
-        args = (bull.data.get("arguments") or [])[:6]
-        bull_view = {
-            "role": "bull",
-            "thesis": bull.data.get("thesis"),
-            "arguments": [
-                {"claim": a.get("claim"), "evidence": a.get("evidence")}
-                for a in args if isinstance(a, dict)
-            ],
-            "what_would_break_this": (bull.data.get("what_would_break_this") or [])[:4],
-        }
-    else:
-        bull_view = {}
-    bear_payload = {**base, "bull_case": bull_view}
+    # The bear gets the bull case but not the specialist digest: it attacks the bull,
+    # and digest noise was what pushed it past the token ceiling. The case is trimmed to
+    # the protocol caps and to claim plus key path, because the bear's output is
+    # proportional to its input, which is what makes the adversarial agent fail first.
+    bear_case = bull_view(bull) if bull.status == "ok" else {}
+    bear_payload = {**base, "bull_case": bear_case}
     bear = call_with_fallback("bear", BEAR_SYSTEM, bear_payload, model=model, max_tokens=3200)
 
     return {"bull": bull, "bear": bear}

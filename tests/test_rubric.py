@@ -4,6 +4,7 @@ The design claim is: given the same numbers, the verdict is always identical, an
 missing data can never be laundered into a neutral score.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -330,6 +331,113 @@ def test_a_slash_pair_names_both_operands():
     v = verify.verify_claims("FCF/NI is only 0.86x, so earnings are not cash-backed.", pillars)
     assert v["unverified"] == 0, v
     assert v["derived_from_evidence"] == 1, v
+
+
+def test_output_limits_are_enforced_not_trusted():
+    """The limits are stated as hard requirements in the prompts and were prompt text
+    only. Item overruns are trimmed in place, word overruns are reported for a retry
+    and left intact."""
+    data = {"summary": " ".join(["word"] * 95), "key_points": [" ".join(["w"] * 30)] * 7,
+            "cited_metrics": ["m"] * 6, "evidence_gaps": ["gap"] * 7}
+    violations, retryable = agents.check_limits(data, agents.SPECIALIST_LIMITS)
+    assert len(data["key_points"]) == 5, data
+    assert len(data["cited_metrics"]) == 5, data
+    assert len(data["evidence_gaps"]) == 4, data
+    assert len(data["summary"].split()) == 95, "a word overrun is not trimmed"
+    assert any("summary is 95 words" in v for v in retryable), retryable
+    assert not any("trimmed" in v for v in retryable), retryable
+    assert any("key_points[0] is 30 words" in v for v in violations), violations
+
+
+def test_bull_and_bear_limits_match_their_prompts():
+    """Sizes taken from runs/archive/AAPL_2026-09-12T180753Z.json: a 12 argument bull
+    case against a stated maximum of 5, a 143 word thesis against 80, nine break
+    conditions against 4, and nine bear attacks against 6."""
+    bull = {"thesis": " ".join(["t"] * 143),
+            "arguments": [{"claim": "c", "evidence": "e"}] * 12,
+            "what_would_break_this": ["b"] * 9}
+    _, retryable = agents.check_limits(bull, agents.BULL_LIMITS)
+    assert len(bull["arguments"]) == 5, bull
+    assert len(bull["what_would_break_this"]) == 4, bull
+    assert any("thesis is 143 words" in v for v in retryable), retryable
+    bear = {"rebuttal": " ".join(["r"] * 117),
+            "attacks": [{"counter": " ".join(["c"] * 46)}] * 9, "unresolved": ["q"] * 6}
+    _, retryable = agents.check_limits(bear, agents.BEAR_LIMITS)
+    assert len(bear["attacks"]) == 6, bear
+    assert len(bear["unresolved"]) == 4, bear
+    assert any("attacks[0].counter is 46 words" in v for v in retryable), retryable
+    assert any("rebuttal is 117 words" in v for v in retryable), retryable
+
+
+def test_bull_view_is_the_enforced_case():
+    """The bear sees the bull case trimmed to the protocol caps and to claim plus key
+    path, from one helper shared by the run and the resume path."""
+    class Result:
+        data = {"thesis": "t", "arguments": [{"claim": f"c{i}", "evidence": "e"}
+                                             for i in range(9)],
+                "what_would_break_this": ["b"] * 7, "key_metrics": ["k"]}
+
+    view = agents.bull_view(Result())
+    assert len(view["arguments"]) == agents.BULL_ARGUMENT_CAP == 5, view
+    assert len(view["what_would_break_this"]) == 4, view
+    assert set(view["arguments"][0]) == {"claim", "evidence"}, view
+
+
+def test_debate_evidence_keys_are_checked():
+    """The bull and the bear cite a path per item in "evidence", a field the citation
+    list never covered, plus the bear's strongest metric."""
+    bundle = {"pillars": {"valuation": {"peg": 2.61}}}
+    good = {"arguments": [{"claim": "c", "evidence": "pillars.valuation.peg"}],
+            "attacks": [{"counter": "c", "evidence": "valuation.peg"}],
+            "strongest_bear_metric": {"key": "valuation.peg", "value": 2.61}}
+    assert agents._check_citations(good, bundle) == []
+    bad = {"arguments": [{"claim": "c", "evidence": "pillars.valuation.peer_median_pe"}],
+           "attacks": [{"counter": "c", "evidence": "context.analyst_consensus_eps"}],
+           "strongest_bear_metric": {"key": "valuation.peg"}}
+    out = agents._check_citations(bad, bundle)
+    assert len(out) == 2, out
+    assert any(v.endswith("peer_median_pe") for v in out), out
+    assert any(v.endswith("analyst_consensus_eps") for v in out), out
+
+
+def test_over_limit_output_is_reasked_once_and_the_cleaner_attempt_wins():
+    """The corrective re-call is what enforces the word limits: the prompt did not hold,
+    so the pipeline restates the broken limit once and keeps the cleaner answer."""
+    calls = []
+
+    class FakeCompletions:
+        def create(self, **kw):
+            calls.append(kw["messages"][-1]["content"])
+            over = {"summary": " ".join(["w"] * 70), "key_points": ["p"],
+                    "cited_metrics": ["fundamentals.net_margin_pct"], "evidence_gaps": []}
+            clean = {"summary": " ".join(["w"] * 40), "key_points": ["p"],
+                     "cited_metrics": ["fundamentals.net_margin_pct"], "evidence_gaps": []}
+            body = json.dumps(over if len(calls) == 1 else clean)
+
+            class Choice:
+                finish_reason = "stop"
+                message = type("M", (), {"content": body})
+
+            class Usage:
+                total_tokens = 10
+            return type("R", (), {"choices": [Choice()], "usage": Usage()})
+
+    class FakeClient:
+        chat = type("C", (), {"completions": FakeCompletions()})
+
+    payload = {"pillars": {"fundamentals": {"net_margin_pct": 22.0}}}
+    saved = agents._client
+    agents._client = FakeClient()
+    try:
+        res = agents.call_agent("fundamentals", agents.AGENT_SYSTEM.format(name="fundamentals",
+                                                            remit=agents.SPECIALISTS["fundamentals"]),
+                                payload, strict_json=False)
+    finally:
+        agents._client = saved
+    assert res.status == "ok", res.error
+    assert len(res.data["summary"].split()) == 40, res.data
+    assert len(calls) == 2, calls
+    assert "CORRECTION from the pipeline" in calls[1], calls[1]
 
 
 def test_news_count_survives_the_verify_extras_merge():

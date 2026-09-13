@@ -189,15 +189,11 @@ def run(symbol: str, model: str | None = None, no_llm: bool = False, quiet: bool
             print("  reusing bull case, running bear...")
         bull = _result_from_dict(prev_bull)
         compact = agent_mod._compact_bundle(bundle)
-        args = (bull.data.get("arguments") or [])[:6]
-        bull_view = {
-            "role": "bull", "thesis": bull.data.get("thesis"),
-            "arguments": [{"claim": a.get("claim"), "evidence": a.get("evidence")}
-                          for a in args if isinstance(a, dict)],
-            "what_would_break_this": (bull.data.get("what_would_break_this") or [])[:4],
-        }
+        # Same trim as the run path: one helper, so the resumed bear sees exactly the
+        # case a fresh run would hand it.
         bear = agent_mod.call_with_fallback(
-            "bear", agent_mod.BEAR_SYSTEM, {**compact, "bull_case": bull_view},
+            "bear", agent_mod.BEAR_SYSTEM,
+            {**compact, "bull_case": agent_mod.bull_view(bull)},
             model=model, max_tokens=3200,
         )
         debate = {"bull": bull, "bear": bear}
@@ -226,12 +222,24 @@ def run(symbol: str, model: str | None = None, no_llm: bool = False, quiet: bool
     v = verify_mod.verify_claims(
         all_text, bundle["pillars"], declared_scores=scores, extras=extras,
     )
+    # Violations cover the debate too: the bull's and bear's key paths are checked, and
+    # an over-limit output is recorded here rather than silently kept.
     v["agent_violations"] = {
-        n: r.violations for n, r in specialists.items() if r.violations
+        n: r.violations
+        for n, r in list(specialists.items()) + list(debate.items())
+        if r.violations
     }
-    v["failed_agents"] = [n for n, r in specialists.items() if r.status != "ok"]
+    v["failed_agents"] = [n for n, r in list(specialists.items()) + list(debate.items())
+                         if r.status != "ok"]
     v["unverified_by_agent"] = _attribute(v.get("unverified_at") or [], segments)
     result["verification"] = v
+    if v["agent_violations"]:
+        # Informational, like the verification verdict: a broken output limit or an
+        # unresolvable key path is a protocol fact, and it never moves the score.
+        result["warnings"] = list(result["warnings"]) + [
+            "protocol violations: " + ", ".join(
+                f"{n} ({len(rules)})" for n, rules in v["agent_violations"].items())
+        ]
     if v["verdict"] != "PASS":
         # Informational, never a score: the rubric verdict is computed before any
         # agent runs and no verification result may move it.
@@ -247,7 +255,7 @@ def run(symbol: str, model: str | None = None, no_llm: bool = False, quiet: bool
             print(f"  verification warning: {v['unverified']} ungrounded, "
                   f"{_top_agent(v['unverified_by_agent'])}")
         if v["agent_violations"]:
-            print(f"  citation violations: {list(v['agent_violations'])}")
+            print(f"  protocol violations: {list(v['agent_violations'])}")
         print("  judge synthesis...")
     judge = agent_mod.run_judge(bundle, specialists, debate, v, det["horizons"], model=model)
     result["judge"] = judge.as_dict()

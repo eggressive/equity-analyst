@@ -171,10 +171,11 @@ Honest gaps, in rough order of impact:
 
 ## Known failure modes, already handled
 
-Ten bugs shipped and were fixed during construction. Bugs 1-5, 9 and 10 are Python errors
-in the metric and verification layers; 6 and 7 are LLM-protocol errors; 8 is an HTTP 403
-from SEC EDGAR. `tests/` guards bugs 1-5, 9 and 10. Bugs 6, 7 and 8 have no test and are
-recorded here only, which is a real gap in the suite rather than a claim of coverage.
+Eleven bugs shipped and were fixed during construction. Bugs 1-5, 9, 10 and 11 are Python
+errors in the metric, verification and protocol layers; 6 and 7 are LLM-protocol errors; 8
+is an HTTP 403 from SEC EDGAR. `tests/` guards bugs 1-5 and 9 to 11. Bugs 6, 7 and 8 have
+no test and are recorded here only, which is a real gap in the suite rather than a claim of
+coverage.
 
 1. **Wrong statement row.** Substring matching let `Other Non Operating Income
    Expenses` satisfy the needle `"Operating Income"`, so Reliance's operating margin
@@ -316,6 +317,27 @@ recorded here only, which is a real gap in the suite rather than a claim of cove
     magnitude, two unrelated metrics derive nothing, a ratio reads as a share in either
     order, and the floor fires on a short text but not on a long one.
 
+11. **Output limits were prompt text only.** Every prompt stated the caps as hard
+    requirements and nothing checked them. From the 2026-09-12 debug runs, kept in
+    `runs/archive/`: `AAPL_2026-09-12T180753Z.json` returned a **12** argument bull case
+    against a stated maximum of 5, a **143** word thesis against 80 and nine break
+    conditions against 4, while **8 of 9** summaries ran past 60 words, the worst at 95;
+    `AAPL_full.json` did worse on the bear with **9** attacks against 6, a 117 word
+    rebuttal against 90 and six unresolved questions against 4; and
+    `RELIANCE_2026-09-12T181207Z.json` put 6 of 9 summaries over. Per-item word caps held
+    even there, 34 words for the longest claim and 32 for the longest counter: the models
+    ignore counts and whole-field caps, not the per-item ones.
+
+    **Fixed 2026-09-13.** `check_limits` trims an item overrun in place and records it,
+    re-asks once when a word overrun arrives and records it if the re-ask fails, and the
+    key path beside every bull argument and bear attack is now checked against the bundle
+    like any other citation. Violations are reported per agent, debate agents included, in
+    `verification.agent_violations` and in `warnings`. The three tracked runs are inside
+    every limit, so enforcement changed none of their numbers, and no run has yet recorded
+    a violation. Guarded by `tests/test_rubric.py`: the caps are applied, a word overrun
+    survives untouched, the corrective re-call happens once, and an invented debate key
+    path is caught.
+
 **Fabrication is treated as worse than absence.** A failed agent returns
 `status="unavailable"` with an error string, never plausible-looking prose: a truncated
 response is detected from `finish_reason == "length"`, retried, and never promoted to an
@@ -326,10 +348,21 @@ been removed: the guarantee rests on the code path, not on a tracked run.
 ## Prompt bounding is part of the protocol
 
 Failure mode 7 generalises: on a chat-completions API you control only `max_tokens`,
-and these models do not stop at a requested JSON size. Every agent prompt therefore
-carries explicit hard limits (max items, max words per field), and the bull's arguments
-are trimmed to 6 before the bear sees them. Without both, the agent that fails is
-always the adversarial one, which is the worst possible component to lose silently.
+and these models do not stop at a requested JSON size. Three layers bound every agent:
+
+1. **The prompt states the caps** as hard requirements (max items, max words per field),
+   which failure mode 11 shows is not enough on its own.
+2. **`check_limits` enforces them in Python.** An item overrun is trimmed in place: the
+   protocol caps the count, and the rest of the pipeline sees a trimmed view anyway. A
+   word overrun is re-asked once with the broken limits restated, then kept intact and
+   recorded, because cutting prose mid-sentence loses meaning silently.
+3. **The payload is bounded.** The bear sees the bull case trimmed to the protocol caps
+   and to claim plus key path, from one helper shared by the run and the resume path.
+   The bear's output is proportional to its input, so the adversarial agent is always
+   the first to fail.
+
+Without all three, the agent that fails is always the adversarial one, which is the
+worst possible component to lose silently.
 
 
 

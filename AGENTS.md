@@ -19,7 +19,7 @@ intact in every change: the LLM layer interprets, the Python layer decides.
 | `src/metrics.py` | 5 metric pillars. Pure functions of the bundle. | Yes. New metrics must be scored or exempted (see below). |
 | `src/rubric.py` | Signal tables, weights, coverage-diluted scoring. The decision layer. | **Owner decision.** Band or weight changes rescore the whole corpus. |
 | `src/verify.py` | Matches every agent-emitted number to evidence or to a derived value whose metrics are named beside it. | Yes, keep it strict. |
-| `src/agents.py` | 9 specialists, Bull, Bear, Judge. Strict JSON, prompt limits, fallback model. | Yes. Read "Prompt bounding" in the README first. |
+| `src/agents.py` | 9 specialists, Bull, Bear, Judge. Strict JSON, enforced output limits, fallback model. | Yes. Read "Prompt bounding" in the README first. |
 | `analyze.py` | Orchestration, run artefacts, resume. | Yes. |
 | `tests/` | Determinism, sign-direction, grounding invariants. | Extend on every fix. |
 
@@ -54,7 +54,11 @@ intact in every change: the LLM layer interprets, the Python layer decides.
    spliced record claims the agents said something they did not.
 7. **No em dashes (U+2014) anywhere.** Code comments, README, docstrings, PR
    descriptions, commit messages. Use a colon, semicolon, parentheses or a
-   new sentence. This covers agent prose in `runs/*.json` too: the model is asked not to
+   new sentence.
+8. **Output limits live in code, not in the prompt.** `check_limits` enforces the caps
+   the prompts state, and the `evidence` path beside every Bull argument and every Bear
+   attack is checked like any other citation. A new agent needs its limit table, or its
+   caps are prose again. This covers agent prose in `runs/*.json` too: the model is asked not to
    emit the character, and `strip_em_dashes` in `src/agents.py` rewrites it to a comma on
    the way in, so a run cannot ship one.
 
