@@ -21,7 +21,7 @@ intact in every change: the LLM layer interprets, the Python layer decides.
 | `src/verify.py` | Matches every agent-emitted number to evidence or to a derived value whose metrics are named beside it. | Yes, keep it strict. |
 | `src/agents.py` | 9 specialists, Bull, Bear, Judge. Strict JSON, enforced output limits, fallback model. | Yes. Read "Prompt bounding" in the README first. |
 | `analyze.py` | Orchestration, run artefacts, resume. | Yes. |
-| `tests/` | Determinism, sign-direction, grounding invariants. | Extend on every fix. |
+| `tests/` | Determinism, sign-direction, grounding invariants, and the document rules in `tests/test_docs.py`. | Extend on every fix. |
 
 ## Hard rules
 
@@ -116,6 +116,31 @@ comments alike.
 - **Relative links between documents, including to anchors:** `[Part 5](GitHub/copilot-pilot.md#part-5--decide)`.
 - **Don't duplicate content across documents.** Link to the one that owns
   the topic.
+
+## Changelog rules (CHANGELOG.md)
+
+`CHANGELOG.md` owns what changed between releases. `git log` owns every change at commit
+granularity, `README.md` owns current behaviour and its measurements, `TODO.md` owns open
+work. Merge is a squash, so one merged PR is one entry.
+
+- **Write the entry in the PR that makes the change.** The evidence that justifies it is in
+  that diff, and the entry lands with it.
+- **One to three lines**, in user-visible terms, with the PR number. Link the README section
+  that owns a measurement instead of restating a number: two copies of a number drift.
+- **Mark the three cases a reader of an old artefact has to know.**
+  - **Rescore:** verdicts move, so committed `runs/*.json` are stale. Name the runs re-run.
+  - **Schema:** `runs/*.json` gained or lost a key, so consumers of the artefact break.
+  - **Cost:** the change implies paid LLM calls, as the refresh in PR #11 did.
+- **Never** put measurements, root causes or test counts in an entry. The README failure
+  modes and the PR body own those.
+- **Release:** promote `Unreleased` to `## [0.1.0] - YYYY-MM-DD`, tag it, and use the section
+  body as the GitHub Release body. Keep `## [Unreleased]` present at all times: an artefact
+  records the model and the timestamp but not the code, so the tag is the only link from a
+  run to the revision that produced it.
+- **Checked mechanically** by `tests/test_docs.py`: the Unreleased section, dated version
+  headings, resolvable links and anchors, named `runs/` files, recorded test counts, and no
+  em dash in documents and modules. Literal inline run paths must exist; put hypothetical
+  output examples in fenced blocks. `tests/test_rubric.py` owns the run-artifact em-dash check.
 
 ## Verification scope (src/verify.py)
 

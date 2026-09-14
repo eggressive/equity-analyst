@@ -26,6 +26,7 @@ the LLM layer generates interpretation, the Python layer generates the decision.
 | `analyze.py` | Orchestration, run artefacts, resume. | No |
 | `tests/test_rubric.py` | Determinism, sign-direction, citation and verifier invariants. | No |
 | `tests/test_metrics.py` | Statement-row matching: the silently-wrong-number class of bug. | No |
+| `tests/test_docs.py` | Document rules: one changelog, resolvable links, no em dash. No third-party imports. | No |
 
 ## Install
 
@@ -51,6 +52,7 @@ cp .env.example .env                 # optional, documents the overrides
 .venv/bin/python analyze.py AAPL --no-llm   # deterministic only, zero API cost
 .venv/bin/python tests/test_rubric.py
 .venv/bin/python tests/test_metrics.py
+.venv/bin/python tests/test_docs.py
 ```
 
 `--resume <run.json>` reuses the `ok` stages of an earlier run (`--out` writes the file
@@ -322,8 +324,8 @@ coverage.
     order, and the floor fires on a short text but not on a long one.
 
 11. **Output limits were prompt text only.** Every prompt stated the caps as hard
-    requirements and nothing checked them. From the 2026-09-12 debug runs, kept in
-    `runs/archive/`: `AAPL_2026-09-12T180753Z.json` returned a **12** argument bull case
+    requirements and nothing checked them. The 2026-09-12 debug runs cited below are not
+    committed; their current location is unknown. `AAPL_2026-09-12T180753Z.json` returned a **12** argument bull case
     against a stated maximum of 5, a **143** word thesis against 80 and nine break
     conditions against 4, while **8 of 9** summaries ran past 60 words, the worst at 95;
     `AAPL_full.json` did worse on the bear with **9** attacks against 6, a 117 word
