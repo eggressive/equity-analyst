@@ -139,7 +139,8 @@ work. Merge is a squash, so one merged PR is one entry.
   run to the revision that produced it.
 - **Checked mechanically** by `tests/test_docs.py`: the Unreleased section, dated version
   headings, resolvable links and anchors, named `runs/` files, recorded test counts, and no
-  em dash.
+  em dash in documents and modules. Literal inline run paths must exist; put hypothetical
+  output examples in fenced blocks. `tests/test_rubric.py` owns the run-artifact em-dash check.
 
 ## Verification scope (src/verify.py)
 

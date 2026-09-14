@@ -324,8 +324,8 @@ coverage.
     order, and the floor fires on a short text but not on a long one.
 
 11. **Output limits were prompt text only.** Every prompt stated the caps as hard
-    requirements and nothing checked them. From the 2026-09-12 debug runs, kept in
-    `runs/archive/`: `AAPL_2026-09-12T180753Z.json` returned a **12** argument bull case
+    requirements and nothing checked them. The 2026-09-12 debug runs cited below are not
+    committed; their current location is unknown. `AAPL_2026-09-12T180753Z.json` returned a **12** argument bull case
     against a stated maximum of 5, a **143** word thesis against 80 and nine break
     conditions against 4, while **8 of 9** summaries ran past 60 words, the worst at 95;
     `AAPL_full.json` did worse on the bear with **9** attacks against 6, a 117 word

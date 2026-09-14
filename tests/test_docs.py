@@ -18,7 +18,10 @@ otherwise have to check by hand:
 from __future__ import annotations
 
 import re
+from datetime import date
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -39,11 +42,11 @@ LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 FENCE_RE = re.compile(r"```.*?```", re.S)
 CODE_SPAN_RE = re.compile(r"`[^`\n]*`")
 HEADING_RE = re.compile(r"^#{1,6}\s+(.*?)\s*$", re.M)
-UNRELEASED_RE = re.compile(r"^## \[Unreleased\]", re.M)
-VERSION_RE = re.compile(r"^## \[([^\]]+)\]", re.M)
+UNRELEASED_RE = re.compile(r"^## \[Unreleased\][ \t]*$", re.M)
+VERSION_RE = re.compile(r"^##[ \t]+([^\n]+)", re.M)
 RUN_REF_RE = re.compile(r"`(runs/[A-Za-z0-9_./-]+)`")
 COUNT_RE = re.compile(r"`tests/(test_\w+\.py)`[^.\n]*?(\d+)/\2")
-DATE_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+ - \d{4}-\d{2}-\d{2}")
+DATE_RE = re.compile(r"\[[0-9]+\.[0-9]+\.[0-9]+\] - (\d{4}-\d{2}-\d{2})")
 
 
 def _prose(path: Path) -> str:
@@ -99,19 +102,68 @@ def test_changelog_keeps_an_unreleased_section():
         "CHANGELOG.md has no '## [Unreleased]' section")
 
 
-def test_changelog_version_headings_carry_a_date():
-    for heading in VERSION_RE.findall((ROOT / "CHANGELOG.md").read_text()):
-        if heading == "Unreleased":
+def _check_version_headings(text: str):
+    for heading in VERSION_RE.findall(FENCE_RE.sub(" ", text)):
+        heading = heading.strip()
+        if heading == "[Unreleased]":
             continue
-        assert DATE_RE.fullmatch(heading), (
-            f"version heading '{heading}' is not '<major>.<minor>.<patch> - YYYY-MM-DD'")
+        match = DATE_RE.fullmatch(heading)
+        assert match, (
+            f"version heading '{heading}' is not '[<major>.<minor>.<patch>] - YYYY-MM-DD'")
+        try:
+            date.fromisoformat(match.group(1))
+        except ValueError:
+            raise AssertionError(f"version heading '{heading}' has an invalid date") from None
+
+
+def test_changelog_version_headings_carry_a_date():
+    _check_version_headings((ROOT / "CHANGELOG.md").read_text())
+
+
+def test_release_heading_examples():
+    _check_version_headings("## [Unreleased]\n## [0.1.0] - 2026-09-14\n")
+    _check_version_headings("## [1.2.3] - 2024-02-29\n")
+    for heading in (
+        "## [0.1.0]", "## [0.1.0 - 2026-09-14]", "## 0.1.0 - 2026-09-14",
+        "## [0.1] - 2026-09-14", "## [0.1.0] - 2026-02-30",
+        "## [0.1.0] - 2026-9-14", "## [0.1.0] - 2026-09-14 trailing",
+    ):
+        try:
+            _check_version_headings(heading)
+        except AssertionError:
+            continue
+        raise AssertionError(f"invalid release heading accepted: {heading}")
 
 
 def test_named_run_artifacts_exist():
-    for name in ("CHANGELOG.md", "TODO.md"):
-        text = (ROOT / name).read_text()
+    # Fenced command examples and glob patterns do not claim a committed file exists.
+    # Inline literal paths and directories in prose do, including README measurements.
+    for name in DOCUMENTS:
+        text = FENCE_RE.sub(" ", (ROOT / name).read_text())
         for ref in RUN_REF_RE.findall(text):
             assert (ROOT / ref).exists(), f"{name} names {ref}, which does not exist"
+
+
+def test_missing_run_references_in_every_document_are_rejected():
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "runs").mkdir()
+        (root / "runs/present.json").write_text("{}")
+        baseline = "`runs/present.json` and `runs/*.json`\n```bash\ncat runs/example.json\n```\n"
+        for name in DOCUMENTS:
+            (root / name).write_text(baseline)
+        with patch.dict(globals(), ROOT=root):
+            test_named_run_artifacts_exist()
+            for name in DOCUMENTS:
+                for ref in ("runs/missing.json", "runs/archive/"):
+                    (root / name).write_text(baseline + f"Missing: `{ref}`\n")
+                    try:
+                        test_named_run_artifacts_exist()
+                    except AssertionError as error:
+                        assert name in str(error) and ref in str(error)
+                    else:
+                        raise AssertionError(f"missing reference accepted in {name}: {ref}")
+                    (root / name).write_text(baseline)
 
 
 def test_recorded_test_counts_match_the_suites():
